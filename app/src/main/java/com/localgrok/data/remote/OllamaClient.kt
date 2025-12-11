@@ -12,18 +12,18 @@ import java.util.concurrent.TimeUnit
  * Provides configured Retrofit instance for Ollama API
  */
 object OllamaClient {
-    
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = true
     }
-    
+
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         // Use HEADERS instead of BODY to avoid buffering streaming responses
         level = HttpLoggingInterceptor.Level.HEADERS
     }
-    
+
     private fun createOkHttpClient(): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -32,7 +32,7 @@ object OllamaClient {
             .addInterceptor(loggingInterceptor)
             .build()
     }
-    
+
     /**
      * Create a new OllamaApiService with the specified base URL
      * @param serverIp The IP address of the Ollama server (e.g., "192.168.1.50")
@@ -40,16 +40,16 @@ object OllamaClient {
      */
     fun createService(serverIp: String, port: Int = 11434): OllamaApiService {
         val baseUrl = "http://$serverIp:$port/"
-        
+
         val retrofit = Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(createOkHttpClient())
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-        
+
         return retrofit.create(OllamaApiService::class.java)
     }
-    
+
     /**
      * Get the JSON parser for manual parsing of streaming responses
      */

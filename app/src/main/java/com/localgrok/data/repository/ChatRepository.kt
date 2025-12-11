@@ -36,7 +36,7 @@ class ChatRepository(
     private var ollamaService: OllamaApiService? = null
     private var searxngService: SearxngApiService? = null
     private val json = OllamaClient.getJson()
-    
+
     // Tool call detection regex
     companion object {
         // Generic tool call regex - captures tool name and full JSON
@@ -45,78 +45,78 @@ class ChatRepository(
             """<tool_call>\s*(\{[^}]+\})\s*</tool_call>""",
             RegexOption.DOT_MATCHES_ALL
         )
-        
+
         // Without closing tag (model sometimes omits it)
         private val TOOL_CALL_REGEX_OPEN = Regex(
             """<tool_call>\s*(\{[^}]+\})""",
             RegexOption.DOT_MATCHES_ALL
         )
-        
+
         // Pattern to detect if response is STARTING with a tool call
         private const val TOOL_CALL_PREFIX = "<tool_call>"
-        
+
         // Regex to strip tool_result tags from responses (model sometimes echoes these back)
         // Matches <tool_result>...</tool_result> with any content inside
         private val TOOL_RESULT_REGEX = Regex(
             """<tool_result>[\s\S]*?</tool_result>""",
             RegexOption.DOT_MATCHES_ALL
         )
-        
+
         // Also strip unclosed tool_result tags
         private val TOOL_RESULT_UNCLOSED_REGEX = Regex(
             """<tool_result>[\s\S]*$""",
             RegexOption.DOT_MATCHES_ALL
         )
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // API Configuration
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     fun configureServer(serverIp: String, port: Int = 11434) {
         ollamaService = OllamaClient.createService(serverIp, port)
     }
-    
+
     fun configureSearxng(serverIp: String, port: Int = 8888) {
         searxngService = SearxngClient.createService(serverIp, port)
     }
-    
+
     fun isServerConfigured(): Boolean = ollamaService != null
-    
+
     fun isSearchConfigured(): Boolean = searxngService != null
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // Chat Operations (Local Database)
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     fun getAllChats(): Flow<List<ChatEntity>> = chatDao.getAllChats()
-    
+
     fun getChatById(chatId: Long): Flow<ChatEntity?> = chatDao.getChatByIdFlow(chatId)
-    
+
     suspend fun createChat(title: String, model: String): Long {
         val chat = ChatEntity(title = title, model = model)
         return chatDao.insertChat(chat)
     }
-    
+
     suspend fun updateChatTitle(chatId: Long, title: String) {
         chatDao.updateChatTitle(chatId, title)
     }
-    
+
     suspend fun deleteChat(chatId: Long) {
         chatDao.deleteChatById(chatId)
     }
-    
+
     suspend fun deleteAllChats() {
         chatDao.deleteAllChats()
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // Message Operations (Local Database)
     // ═══════════════════════════════════════════════════════════════════════
-    
-    fun getMessagesForChat(chatId: Long): Flow<List<MessageEntity>> = 
+
+    fun getMessagesForChat(chatId: Long): Flow<List<MessageEntity>> =
         messageDao.getMessagesForChat(chatId)
-    
+
     suspend fun addUserMessage(chatId: Long, content: String): Long {
         val message = MessageEntity(
             chatId = chatId,
@@ -126,7 +126,7 @@ class ChatRepository(
         chatDao.updateChatTimestamp(chatId)
         return messageDao.insertMessage(message)
     }
-    
+
     suspend fun createAssistantMessage(chatId: Long): Long {
         val message = MessageEntity(
             chatId = chatId,
@@ -136,47 +136,66 @@ class ChatRepository(
         )
         return messageDao.insertMessage(message)
     }
-    
+
     suspend fun updateMessageContent(messageId: Long, content: String, isStreaming: Boolean) {
         messageDao.updateMessageContent(messageId, content, isStreaming)
     }
-    
+
     /**
      * Update message with full state including thinking indicator
      */
     suspend fun updateMessageState(
-        messageId: Long, 
-        content: String, 
-        isStreaming: Boolean, 
-        isThinking: Boolean
+        messageId: Long,
+        content: String,
+        isStreaming: Boolean,
+        isThinking: Boolean,
+        toolUsed: Boolean = false,
+        toolDisplayName: String = ""
     ) {
-        messageDao.updateMessageState(messageId, content, isStreaming, isThinking)
+        messageDao.updateMessageState(
+            messageId,
+            content,
+            isStreaming,
+            isThinking,
+            toolUsed,
+            toolDisplayName
+        )
     }
-    
+
     /**
      * Update message with full state including thinking indicator and reasoning content
      */
     suspend fun updateMessageStateWithReasoning(
-        messageId: Long, 
-        content: String, 
-        isStreaming: Boolean, 
+        messageId: Long,
+        content: String,
+        isStreaming: Boolean,
         isThinking: Boolean,
-        reasoningContent: String
+        reasoningContent: String,
+        toolUsed: Boolean = false,
+        toolDisplayName: String = ""
     ) {
-        messageDao.updateMessageStateWithReasoning(messageId, content, isStreaming, isThinking, reasoningContent)
+        messageDao.updateMessageStateWithReasoning(
+            messageId,
+            content,
+            isStreaming,
+            isThinking,
+            reasoningContent,
+            toolUsed,
+            toolDisplayName
+        )
     }
-    
+
     /**
      * Update only the reasoning content of a message
      */
     suspend fun updateReasoningContent(messageId: Long, reasoningContent: String) {
         messageDao.updateReasoningContent(messageId, reasoningContent)
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // Streaming Chat API
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     /**
      * Send a message and receive streaming response tokens
      */
@@ -189,10 +208,10 @@ class ChatRepository(
             emit(StreamingResult.Error("Server not configured"))
             return@flow
         }
-        
+
         try {
             emit(StreamingResult.Started)
-            
+
             // Convert to Ollama message format
             val ollamaMessages = messages.map { msg ->
                 OllamaMessage(
@@ -200,39 +219,39 @@ class ChatRepository(
                     content = msg.content
                 )
             }
-            
+
             val request = OllamaChatRequest(
                 model = model,
                 messages = ollamaMessages,
                 stream = true
             )
-            
+
             val response = service.chatStream(request)
-            
+
             if (!response.isSuccessful) {
                 emit(StreamingResult.Error("API Error: ${response.code()} - ${response.message()}"))
                 return@flow
             }
-            
+
             val responseBody = response.body() ?: run {
                 emit(StreamingResult.Error("Empty response body"))
                 return@flow
             }
-            
+
             // Read streaming response line by line
             responseBody.byteStream().bufferedReader().use { reader ->
                 var fullContent = ""
-                
+
                 reader.forEachLine { line ->
                     if (line.isNotBlank()) {
                         try {
                             val chatResponse = json.decodeFromString<OllamaChatResponse>(line)
-                            
+
                             chatResponse.message?.content?.let { token ->
                                 fullContent += token
                                 // Emit is not allowed in forEachLine directly, we'll handle this differently
                             }
-                            
+
                             if (chatResponse.done) {
                                 // Done signal handled below
                             }
@@ -242,16 +261,16 @@ class ChatRepository(
                     }
                 }
             }
-            
+
         } catch (e: Exception) {
             emit(StreamingResult.Error("Network error: ${e.message}"))
         }
     }.flowOn(Dispatchers.IO)
-    
+
     /**
      * Send a message and receive streaming response with callback
      * This is the preferred method for streaming as it handles token emission properly
-     * 
+     *
      * @param model The model to use for generation
      * @param messages The conversation history
      * @param systemPrompt Optional system prompt to prepend
@@ -275,7 +294,7 @@ class ChatRepository(
             onError("Server not configured. Please set server IP in settings.")
             return@withContext
         }
-        
+
         try {
             // Build messages list with optional system prompt
             val ollamaMessages = buildList {
@@ -288,26 +307,26 @@ class ChatRepository(
                     OllamaMessage(role = msg.role, content = msg.content)
                 })
             }
-            
+
             val request = OllamaChatRequest(
                 model = model,
                 messages = ollamaMessages,
                 stream = true,
                 think = thinkEnabled
             )
-            
+
             val response = service.chatStream(request)
-            
+
             if (!response.isSuccessful) {
                 onError("API Error: ${response.code()} - ${response.message()}")
                 return@withContext
             }
-            
+
             val responseBody = response.body() ?: run {
                 onError("Empty response body")
                 return@withContext
             }
-            
+
             // Read streaming response line by line
             // Use runInterruptible to make blocking I/O cancellable
             responseBody.byteStream().bufferedReader().use { reader ->
@@ -316,11 +335,11 @@ class ChatRepository(
                     while (line != null) {
                         // Check for cancellation on each iteration
                         coroutineContext.ensureActive()
-                        
+
                         if (line.isNotBlank()) {
                             try {
                                 val chatResponse = json.decodeFromString<OllamaChatResponse>(line)
-                                
+
                                 // When thinking is enabled, process thinking tokens first
                                 if (thinkEnabled) {
                                     chatResponse.message?.thinking?.let { thinkingToken ->
@@ -329,14 +348,14 @@ class ChatRepository(
                                         }
                                     }
                                 }
-                                
+
                                 // Process regular content tokens
                                 chatResponse.message?.content?.let { token ->
                                     if (token.isNotEmpty()) {
                                         onToken(token)
                                     }
                                 }
-                                
+
                                 if (chatResponse.done) {
                                     onComplete()
                                 }
@@ -353,7 +372,7 @@ class ChatRepository(
                     throw e  // Re-throw to properly cancel the coroutine
                 }
             }
-            
+
         } catch (e: CancellationException) {
             // Don't report cancellation as an error - it's expected when user stops generation
             throw e
@@ -361,7 +380,7 @@ class ChatRepository(
             onError("Network error: ${e.message}")
         }
     }
-    
+
     /**
      * List available models from the server
      */
@@ -369,7 +388,7 @@ class ChatRepository(
         val service = ollamaService ?: return@withContext Result.failure(
             Exception("Server not configured")
         )
-        
+
         try {
             val response = service.listModels()
             if (response.isSuccessful) {
@@ -382,13 +401,13 @@ class ChatRepository(
             Result.failure(e)
         }
     }
-    
+
     /**
      * Check server connectivity
      */
     suspend fun checkServerConnection(): Boolean = withContext(Dispatchers.IO) {
         val service = ollamaService ?: return@withContext false
-        
+
         try {
             val response = service.healthCheck()
             // Close the response body to avoid resource leaks
@@ -399,11 +418,11 @@ class ChatRepository(
             false
         }
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // Tool Calling
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     /**
      * Clean tool artifacts from response content before displaying to user.
      * Removes <tool_result>...</tool_result> and <tool_call>...</tool_call> tags
@@ -411,33 +430,33 @@ class ChatRepository(
      */
     fun cleanToolArtifacts(response: String): String {
         var cleaned = response
-        
+
         // Remove tool_result tags (closed)
         cleaned = TOOL_RESULT_REGEX.replace(cleaned, "")
-        
+
         // Remove tool_result tags (unclosed - model stopped mid-output)
         cleaned = TOOL_RESULT_UNCLOSED_REGEX.replace(cleaned, "")
-        
+
         // Remove tool_call tags (closed) - in case model outputs tool call in non-first position
         cleaned = TOOL_CALL_REGEX_CLOSED.replace(cleaned, "")
-        
+
         // Remove tool_call tags (unclosed)
         cleaned = TOOL_CALL_REGEX_OPEN.replace(cleaned, "")
-        
+
         return cleaned.trim()
     }
-    
+
     /**
      * Check if the response is starting with a tool call pattern
      * Used for early detection to show tool execution indicator immediately
      */
     fun isStartingWithToolCall(response: String): Boolean {
         val trimmed = response.trimStart()
-        return trimmed.startsWith(TOOL_CALL_PREFIX) || 
+        return trimmed.startsWith(TOOL_CALL_PREFIX) ||
                // Also check partial matches as tokens come in
                TOOL_CALL_PREFIX.startsWith(trimmed) && trimmed.isNotEmpty() && trimmed.length < TOOL_CALL_PREFIX.length
     }
-    
+
     /**
      * Detect and parse a tool call from the response
      * Returns ToolCall with name and parameters, or null if no tool call found
@@ -452,7 +471,7 @@ class ChatRepository(
             else -> null
         }
     }
-    
+
     /**
      * Extract and parse the tool call payload from the response.
      * This is more tolerant than the previous regex-only approach and
@@ -463,16 +482,16 @@ class ChatRepository(
         val startIndex = response.indexOf(TOOL_CALL_PREFIX)
         if (startIndex == -1) return null
         val afterTagIndex = startIndex + TOOL_CALL_PREFIX.length
-        
+
         // Grab everything after <tool_call>, optionally stopping at </tool_call>
         val trailing = response.substring(afterTagIndex)
         val endIndex = trailing.indexOf("</tool_call>")
         val inner = if (endIndex != -1) trailing.substring(0, endIndex) else trailing
-        
+
         // Find the first balanced JSON object within the inner string
         val jsonStart = inner.indexOf('{')
         if (jsonStart == -1) return null
-        
+
         var depth = 0
         var jsonEnd = -1
         for (i in jsonStart until inner.length) {
@@ -487,14 +506,14 @@ class ChatRepository(
                 }
             }
         }
-        
+
         val jsonString = if (jsonEnd != -1) {
             inner.substring(jsonStart, jsonEnd + 1)
         } else {
             // Fallback: take the rest of the string if no closing brace yet (streaming)
             inner.substring(jsonStart)
         }
-        
+
         return runCatching {
             val element: JsonElement = json.decodeFromString(jsonString)
             val obj = element.jsonObject
@@ -511,7 +530,7 @@ class ChatRepository(
         val name: String,
         val query: String?
     )
-    
+
     /**
      * Get the response content before the tool call (to display to user)
      * For tool-first responses, this should be empty
@@ -529,7 +548,7 @@ class ChatRepository(
         }
         return response
     }
-    
+
     /**
      * Execute a tool and return the result
      */
@@ -539,30 +558,30 @@ class ChatRepository(
             is ToolCall.GetDateTime -> getCurrentDateTime()
         }
     }
-    
+
     /**
      * Execute a web search using SearXNG
      */
     private suspend fun executeWebSearch(query: String): String = withContext(Dispatchers.IO) {
         val service = searxngService ?: return@withContext "Search not configured. Please set SearXNG port in settings."
-        
+
         try {
             val response = service.search(query)
-            
+
             if (!response.isSuccessful) {
                 return@withContext "Search failed: ${response.code()} - ${response.message()}"
             }
-            
+
             val searchResponse = response.body() ?: return@withContext "Empty search response"
             val formattedResults = SearxngClient.formatSearchResults(searchResponse)
-            
+
             formattedResults
         } catch (e: Exception) {
             android.util.Log.e("ChatRepository", "Search error: ${e.message}", e)
             "Search error: ${e.message}"
         }
     }
-    
+
     /**
      * Get current date and time
      */
@@ -579,7 +598,7 @@ class ChatRepository(
 sealed class ToolCall {
     data class WebSearch(val query: String) : ToolCall()
     data object GetDateTime : ToolCall()
-    
+
     val displayName: String
         get() = when (this) {
             is WebSearch -> "Searching..."

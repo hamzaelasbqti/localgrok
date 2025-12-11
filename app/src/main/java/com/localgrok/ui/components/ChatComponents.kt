@@ -43,6 +43,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import com.localgrok.ui.theme.InterFont
 import com.localgrok.ui.theme.LocalAppColors
 import com.localgrok.ui.theme.LocalGrokColors
@@ -57,6 +62,40 @@ val ThinkingGrey = Color(0xFF808080)
 val BrainYellow = Color(0xFFFFD600)
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CUSTOM ICONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+@Composable
+fun TwoLineMenuIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = 2.dp.toPx()
+        val lineSpacing = 6.dp.toPx()
+        val padding = 4.dp.toPx()
+
+        // Top line
+        drawLine(
+            color = tint,
+            start = Offset(padding, size.height / 2 - lineSpacing / 2),
+            end = Offset(size.width - padding, size.height / 2 - lineSpacing / 2),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+
+        // Bottom line
+        drawLine(
+            color = tint,
+            start = Offset(padding, size.height / 2 + lineSpacing / 2),
+            end = Offset(size.width - padding, size.height / 2 + lineSpacing / 2),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TOP BAR COMPONENTS - GROK STYLE
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -68,7 +107,8 @@ fun GrokTopBar(
     modifier: Modifier = Modifier
 ) {
     var isAskActive by remember { mutableStateOf(true) }
-    
+    val context = LocalContext.current
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -77,27 +117,33 @@ fun GrokTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Hamburger Menu
+        // Hamburger Menu (2 lines)
         IconButton(onClick = onMenuClick) {
-            Icon(
-                imageVector = Icons.Default.Menu,
-                contentDescription = "Menu",
+            TwoLineMenuIcon(
                 tint = colors.textPrimary,
                 modifier = Modifier.size(24.dp)
             )
         }
-        
+
         // Toggle Pill - Ask/Imagine
         TogglePill(
             leftLabel = "Ask",
             rightLabel = "Imagine",
             isLeftActive = isAskActive,
-            onToggle = { isAskActive = it },
+            onToggle = { toLeft ->
+                if (toLeft) {
+                    // Allow toggling to Ask
+                    isAskActive = true
+                } else {
+                    // Prevent toggling to Imagine, show toast instead
+                    Toast.makeText(context, "Coming soon!", Toast.LENGTH_SHORT).show()
+                }
+            },
             leftIcon = Icons.Outlined.ChatBubbleOutline,
             rightIcon = Icons.Outlined.AutoAwesome,
             colors = colors
         )
-        
+
         // New Conversation Icon
         IconButton(onClick = onNewConversationClick) {
             Icon(
@@ -152,7 +198,7 @@ fun TogglePill(
                 color = if (isLeftActive) colors.textPrimary else colors.textSecondary
             )
         }
-        
+
         // Right Option
         Row(
             modifier = Modifier
@@ -195,7 +241,7 @@ fun GrokInputCluster(
     modifier: Modifier = Modifier
 ) {
     // This is kept for backwards compatibility - delegates to UnifiedInputBar
-    var selectedModel by remember { 
+    var selectedModel by remember {
         mutableStateOf(
             com.localgrok.ui.components.chat.ModelOption(
                 id = "default",
@@ -206,7 +252,7 @@ fun GrokInputCluster(
             )
         )
     }
-    
+
     com.localgrok.ui.components.chat.UnifiedInputBar(
         value = value,
         onValueChange = onValueChange,
@@ -232,7 +278,7 @@ fun StreamingIndicator() {
         ),
         label = "alpha"
     )
-    
+
     Text(
         text = "generating...",
         style = MaterialTheme.typography.labelSmall,

@@ -35,7 +35,7 @@ fun LocalGrokNavHost(
 ) {
     // Global navigation debounce state to prevent rapid-clicking issues
     var isNavigationInProgress by remember { mutableStateOf(false) }
-    
+
     NavHost(
         navController = navController,
         startDestination = Routes.CHAT,
@@ -44,7 +44,7 @@ fun LocalGrokNavHost(
         composable(Routes.CHAT) {
             // Reset navigation flag when we arrive at chat screen
             isNavigationInProgress = false
-            
+
             ChatScreen(
                 viewModel = chatViewModel,
                 onNavigateToSettings = {
@@ -61,11 +61,11 @@ fun LocalGrokNavHost(
                 }
             )
         }
-        
+
         composable(Routes.SETTINGS) {
             // Reset navigation flag when we arrive at settings screen
             isNavigationInProgress = false
-            
+
             SettingsScreen(
                 viewModel = settingsViewModel,
                 onNavigateBack = {

@@ -24,8 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import com.localgrok.ui.theme.LocalGrokColors
 import com.localgrok.ui.theme.LocalAppColors
+import com.localgrok.ui.theme.LocalGrokColors
 
 /**
  * Content-aware indicator for tool execution.
@@ -40,7 +40,7 @@ fun ToolExecutionIndicator(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "tool_pulse")
-    
+
     // Pulse animation only when actively executing
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.6f,
@@ -51,25 +51,27 @@ fun ToolExecutionIndicator(
         ),
         label = "tool_alpha"
     )
-    
+
     // Determine icon and label based on displayText content and completion state
     val (icon, label) = when {
         displayText.contains("Search", ignoreCase = true) -> {
             val text = if (isCompleted) "Searched the web" else "Searching the web..."
             Pair(Icons.Rounded.Search, text)
         }
-        displayText.contains("time", ignoreCase = true) || 
-        displayText.contains("date", ignoreCase = true) || 
-        displayText.contains("calendar", ignoreCase = true) -> {
+
+        displayText.contains("time", ignoreCase = true) ||
+                displayText.contains("date", ignoreCase = true) ||
+                displayText.contains("calendar", ignoreCase = true) -> {
             val text = if (isCompleted) "Checked calendar" else "Checking calendar..."
             Pair(Icons.Rounded.Schedule, text)
         }
+
         else -> {
             val text = if (isCompleted) "Completed" else "Working..."
             Pair(Icons.Rounded.AutoAwesome, text)
         }
     }
-    
+
     Row(
         modifier = modifier.padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -88,9 +90,9 @@ fun ToolExecutionIndicator(
                     }
                 }
         )
-        
+
         Spacer(modifier = Modifier.width(8.dp))
-        
+
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium.copy(

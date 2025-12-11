@@ -1,8 +1,10 @@
 package com.localgrok.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,14 +25,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -48,7 +46,6 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
-import com.localgrok.data.local.entity.ChatEntity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -61,30 +58,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
-import com.localgrok.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.localgrok.R
+import com.localgrok.data.local.entity.ChatEntity
 import com.localgrok.ui.components.EmptyChatPlaceholder
 import com.localgrok.ui.components.GrokTopBar
 import com.localgrok.ui.components.chat.AssistantMessageBubble
 import com.localgrok.ui.components.chat.DEFAULT_MODEL
-import com.localgrok.ui.components.chat.MODEL_OPTIONS
-import com.localgrok.ui.components.chat.ModelOption
 import com.localgrok.ui.components.chat.UnifiedInputBar
 import com.localgrok.ui.components.chat.UserMessageBubble
 import com.localgrok.ui.theme.InterFont
 import com.localgrok.ui.theme.LocalAppColors
 import com.localgrok.ui.viewmodel.ChatViewModel
 import com.localgrok.ui.viewmodel.ConnectionStatus
-import com.localgrok.ui.viewmodel.StreamingMessageState
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -103,42 +98,42 @@ fun ChatScreen(
     val streamingState by viewModel.streamingState.collectAsState()
     val reasoningContent by viewModel.reasoningContent.collectAsState()
     val brainToggleEnabled by viewModel.brainToggleEnabled.collectAsState()
-    
+
     // Theme-aware colors
     val colors = LocalAppColors.current
-    
+
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    
+
     // State for delete confirmation dialog
     var chatToDelete by remember { mutableStateOf<ChatEntity?>(null) }
-    
+
     // State for delete all confirmation dialog
     var showDeleteAllDialog by remember { mutableStateOf(false) }
-    
+
     // State for selected model
     var selectedModel by remember { mutableStateOf(DEFAULT_MODEL) }
-    
+
     // Debounce state to prevent rapid button clicks from causing issues
     var isNavigating by remember { mutableStateOf(false) }
-    
+
     // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
-    
+
     // Ensure drawer is closed when screen is shown (e.g., returning from settings)
     LaunchedEffect(Unit) {
         if (drawerState.isOpen) {
             drawerState.close()
         }
     }
-    
+
     // Reset navigation lock after drawer animations complete
     LaunchedEffect(drawerState.currentValue, drawerState.targetValue) {
         // Only reset when drawer animation is complete (current == target)
@@ -146,14 +141,14 @@ fun ChatScreen(
             isNavigating = false
         }
     }
-    
+
     // Collapse keyboard when drawer starts opening (handles both gesture and programmatic open)
     LaunchedEffect(drawerState.targetValue) {
         if (drawerState.targetValue == DrawerValue.Open) {
             focusManager.clearFocus()
         }
     }
-    
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true, // Enable swipe-to-open and swipe-to-close gestures
@@ -167,7 +162,7 @@ fun ChatScreen(
                     if (!isNavigating && !drawerState.isAnimationRunning) {
                         isNavigating = true
                         viewModel.createNewChat()
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
                             // isNavigating will be reset by LaunchedEffect when animation completes
                         }
@@ -177,7 +172,7 @@ fun ChatScreen(
                     if (!isNavigating && !drawerState.isAnimationRunning) {
                         isNavigating = true
                         viewModel.selectChat(chatId)
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
                             // isNavigating will be reset by LaunchedEffect when animation completes
                         }
@@ -221,7 +216,7 @@ fun ChatScreen(
                     if (!isNavigating && !drawerState.isAnimationRunning) {
                         isNavigating = true
                         focusManager.clearFocus() // Collapse keyboard when opening sidebar
-                        scope.launch { 
+                        scope.launch {
                             drawerState.open()
                             // isNavigating will be reset by LaunchedEffect when animation completes
                         }
@@ -234,7 +229,7 @@ fun ChatScreen(
                     }
                 }
             )
-            
+
             // Overlay Box - Input bar floats over content with transparent corners
             val density = LocalDensity.current
             // Input bar height estimate: compact design matching Grok
@@ -242,7 +237,7 @@ fun ChatScreen(
             val inputBarHeight = 100.dp
             val imeBottomPadding = WindowInsets.ime.getBottom(density)
             val imePaddingDp = with(density) { imeBottomPadding.toDp() }
-            
+
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -276,27 +271,32 @@ fun ChatScreen(
                                     message = message,
                                     modifier = Modifier.padding(vertical = 6.dp)
                                 )
+
                                 "assistant" -> {
                                     // Use streaming state for real-time updates on active message
                                     val isStreamingMessage = streamingState?.messageId == message.id
-                                    val displayMessage = if (isStreamingMessage && streamingState != null) {
-                                        // Override with streaming state for immediate updates
-                                        message.copy(
-                                            content = streamingState!!.content,
-                                            isStreaming = streamingState!!.isStreaming,
-                                            isThinking = streamingState!!.isThinking
-                                        )
-                                    } else {
-                                        message
-                                    }
-                                    
+                                    val displayMessage =
+                                        if (isStreamingMessage && streamingState != null) {
+                                            // Override with streaming state for immediate updates
+                                            message.copy(
+                                                content = streamingState!!.content,
+                                                isStreaming = streamingState!!.isStreaming,
+                                                isThinking = streamingState!!.isThinking,
+                                                toolUsed = streamingState!!.toolUsed,
+                                                toolDisplayName = streamingState!!.toolDisplayName
+                                                    ?: message.toolDisplayName
+                                            )
+                                        } else {
+                                            message
+                                        }
+
                                     // Check if currently executing a tool
-                                    val isExecutingTool = isStreamingMessage && 
-                                        streamingState?.isExecutingTool == true
+                                    val isExecutingTool = isStreamingMessage &&
+                                            streamingState?.isExecutingTool == true
                                     val toolDisplayName = if (isExecutingTool) {
                                         streamingState?.toolDisplayName
                                     } else null
-                                    
+
                                     AssistantMessageBubble(
                                         message = displayMessage,
                                         reasoningContent = reasoningContent[message.id] ?: "",
@@ -310,7 +310,7 @@ fun ChatScreen(
                         }
                     }
                 }
-                
+
                 // Error message (positioned above the input bar)
                 uiState.error?.let { error ->
                     Box(
@@ -328,31 +328,16 @@ fun ChatScreen(
                         )
                     }
                 }
-                
-                // Not configured message (positioned above the input bar)
-                if (uiState.connectionStatus == ConnectionStatus.NotConfigured) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = inputBarHeight + 16.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.darkGrey)
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "⚠ Server not configured. Open drawer and tap Settings to add your Ollama server IP.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textDim
-                        )
-                    }
-                }
-                
+
                 // Child 2: Floating Input Bar (aligned to bottom, with transparent outer container)
                 UnifiedInputBar(
                     value = inputText,
                     onValueChange = { inputText = it },
                     onSend = {
-                        if (inputText.isNotBlank()) {
+                        if (uiState.connectionStatus != ConnectionStatus.Connected) {
+                            viewModel.sendSetupReminder()
+                            inputText = ""
+                        } else if (inputText.isNotBlank()) {
                             viewModel.sendMessage(
                                 content = inputText,
                                 model = selectedModel.modelId
@@ -369,7 +354,8 @@ fun ChatScreen(
                     brainToggleEnabled = brainToggleEnabled,
                     onBrainToggleChanged = { viewModel.toggleBrain() },
                     isGenerating = uiState.isGenerating,
-                    enabled = !uiState.isGenerating && uiState.connectionStatus == ConnectionStatus.Connected,
+                    enabled = !uiState.isGenerating,
+                    allowEmptySend = uiState.connectionStatus != ConnectionStatus.Connected,
                     colors = colors,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -379,7 +365,7 @@ fun ChatScreen(
             }
         }
     }
-    
+
     // Delete confirmation dialog
     chatToDelete?.let { chat ->
         AlertDialog(
@@ -422,7 +408,7 @@ fun ChatScreen(
             }
         )
     }
-    
+
     // Delete all confirmation dialog
     if (showDeleteAllDialog) {
         AlertDialog(
@@ -485,7 +471,7 @@ private fun GrokDrawerContent(
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    
+
     ModalDrawerSheet(
         drawerContainerColor = colors.background,
         modifier = modifier
@@ -504,9 +490,9 @@ private fun GrokDrawerContent(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
             )
-            
+
             Spacer(modifier = Modifier.height(20.dp))
-            
+
             // New Chat Action
             DrawerActionItem(
                 icon = Icons.Outlined.Edit,
@@ -514,7 +500,7 @@ private fun GrokDrawerContent(
                 onClick = onNewConversation,
                 colors = colors
             )
-            
+
             // Delete All Chats Action
             DrawerActionItem(
                 icon = Icons.Outlined.Delete,
@@ -522,17 +508,17 @@ private fun GrokDrawerContent(
                 onClick = onDeleteAllChats,
                 colors = colors
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             HorizontalDivider(
                 color = colors.borderGrey,
                 thickness = 0.5.dp,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // CHATS Header
             Text(
                 text = "CHATS",
@@ -543,9 +529,9 @@ private fun GrokDrawerContent(
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             // Chat List
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -556,7 +542,7 @@ private fun GrokDrawerContent(
                 } else {
                     chats.filter { it.title.contains(searchQuery, ignoreCase = true) }
                 }
-                
+
                 items(
                     items = filteredChats,
                     key = { it.id }
@@ -570,7 +556,7 @@ private fun GrokDrawerContent(
                     )
                 }
             }
-            
+
             // Sticky Footer
             DrawerFooter(
                 onSettingsClick = onSettingsClick,
@@ -680,7 +666,7 @@ private fun ConversationItem(
 ) {
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
     val timeString = remember(chat.updatedAt) { timeFormat.format(chat.updatedAt) }
-    
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -712,7 +698,7 @@ private fun ConversationItem(
                 color = colors.textSubtle
             )
         }
-        
+
         // More options
         IconButton(
             onClick = { onLongClick() },
@@ -738,7 +724,7 @@ private fun DrawerFooter(
         color = colors.borderGrey,
         thickness = 0.5.dp
     )
-    
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -755,9 +741,9 @@ private fun DrawerFooter(
                 .size(40.dp)
                 .clip(CircleShape)
         )
-        
+
         Spacer(modifier = Modifier.width(12.dp))
-        
+
         // App name and version
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -774,7 +760,7 @@ private fun DrawerFooter(
                 color = colors.textSubtle
             )
         }
-        
+
         // Settings gear
         IconButton(onClick = onSettingsClick) {
             Icon(

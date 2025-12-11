@@ -32,6 +32,10 @@ data class MessageEntity(
     @ColumnInfo(defaultValue = "0")
     val isThinking: Boolean = false,  // True when model is in thinking/reasoning phase
     @ColumnInfo(defaultValue = "")
-    val reasoningContent: String = ""  // Stores the thinking/reasoning text for persistence
+    val reasoningContent: String = "",  // Stores the thinking/reasoning text for persistence
+    @ColumnInfo(defaultValue = "0")
+    val toolUsed: Boolean = false,      // True when the assistant used a tool for this message
+    @ColumnInfo(defaultValue = "")
+    val toolDisplayName: String = ""    // Human readable tool label, e.g., "Searching..."
 )
 

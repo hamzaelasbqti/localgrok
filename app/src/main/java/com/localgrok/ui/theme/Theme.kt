@@ -21,62 +21,62 @@ private fun createColorScheme(colors: LocalGrokColors) = darkColorScheme(
     onPrimary = colors.background,
     primaryContainer = colors.darkGrey,
     onPrimaryContainer = colors.textPrimary,
-    
+
     // Secondary - Grey tones
     secondary = colors.mediumGrey,
     onSecondary = colors.textPrimary,
     secondaryContainer = colors.darkGrey,
     onSecondaryContainer = colors.textPrimary,
-    
+
     // Tertiary
     tertiary = colors.textSecondary,
     onTertiary = colors.background,
     tertiaryContainer = colors.darkGrey,
     onTertiaryContainer = colors.textPrimary,
-    
+
     // Background
     background = colors.background,
     onBackground = colors.textPrimary,
-    
+
     // Surface
     surface = colors.background,
     onSurface = colors.textPrimary,
     surfaceVariant = colors.darkGrey,
     onSurfaceVariant = colors.textSecondary,
     surfaceTint = colors.textPrimary,
-    
+
     // Inverse
     inverseSurface = colors.textPrimary,
     inverseOnSurface = colors.background,
     inversePrimary = colors.darkGrey,
-    
+
     // Error
     error = colors.error,
     onError = colors.textPrimary,
     errorContainer = ErrorContainer,
     onErrorContainer = OnErrorContainer,
-    
+
     // Outline
     outline = colors.borderGrey,
     outlineVariant = colors.mediumGrey,
-    
+
     // Scrim
     scrim = colors.background
 )
 
 @Composable
 fun LocalGrokTheme(
-    appTheme: AppTheme = AppTheme.SPACE,
+    appTheme: AppTheme = AppTheme.DARK,
     content: @Composable () -> Unit
 ) {
     val colors = when (appTheme) {
         AppTheme.SPACE -> SpaceColors
         AppTheme.DARK -> DarkColors
     }
-    
+
     val colorScheme = createColorScheme(colors)
     val view = LocalView.current
-    
+
     if (!view.isInEditMode) {
         SideEffect {
             val activity = view.context as ComponentActivity

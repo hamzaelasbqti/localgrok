@@ -1,6 +1,5 @@
 package com.localgrok.ui.theme
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -91,8 +90,8 @@ val SpaceColors = LocalGrokColors(
     success = Color(0xFF30D158)
 )
 
-val LocalAppColors = staticCompositionLocalOf { SpaceColors }
-val LocalAppTheme = compositionLocalOf { AppTheme.SPACE }
+val LocalAppColors = staticCompositionLocalOf { DarkColors }
+val LocalAppTheme = compositionLocalOf { AppTheme.DARK }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOCALGROK COLOR PALETTE - LEGACY COMPATIBILITY

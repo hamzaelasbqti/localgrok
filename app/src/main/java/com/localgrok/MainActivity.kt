@@ -17,18 +17,18 @@ import com.localgrok.ui.viewmodel.ChatViewModel
 import com.localgrok.ui.viewmodel.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
-    
+
     private lateinit var chatViewModel: ChatViewModel
     private lateinit var settingsViewModel: SettingsViewModel
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Enable edge-to-edge display
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        
+
         // Get application instance
         val app = application as LocalGrokApplication
-        
+
         // Create ViewModels with factory
         val viewModelFactory = viewModelFactory {
             initializer {
@@ -44,13 +44,13 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        
+
         chatViewModel = ViewModelProvider(this, viewModelFactory)[ChatViewModel::class.java]
         settingsViewModel = ViewModelProvider(this, viewModelFactory)[SettingsViewModel::class.java]
-        
+
         setContent {
             val appTheme by settingsViewModel.appTheme.collectAsState()
-            
+
             LocalGrokTheme(appTheme = appTheme) {
                 LocalGrokNavHost(
                     chatViewModel = chatViewModel,

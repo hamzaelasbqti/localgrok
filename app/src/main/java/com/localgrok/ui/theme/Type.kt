@@ -57,7 +57,7 @@ val LocalGrokTypography = Typography(
         letterSpacing = 0.sp,
         color = TextWhite
     ),
-    
+
     // Headline styles
     headlineLarge = TextStyle(
         fontFamily = InterFont,
@@ -83,7 +83,7 @@ val LocalGrokTypography = Typography(
         letterSpacing = 0.sp,
         color = TextWhite
     ),
-    
+
     // Title styles
     titleLarge = TextStyle(
         fontFamily = InterFont,
@@ -109,7 +109,7 @@ val LocalGrokTypography = Typography(
         letterSpacing = 0.1.sp,
         color = TextWhite
     ),
-    
+
     // Body styles - Clean readable text
     bodyLarge = TextStyle(
         fontFamily = InterFont,
@@ -135,7 +135,7 @@ val LocalGrokTypography = Typography(
         letterSpacing = 0.4.sp,
         color = TextGrey
     ),
-    
+
     // Label styles
     labelLarge = TextStyle(
         fontFamily = InterFont,

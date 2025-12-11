@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
  * Retrofit service interface for SearXNG API
  */
 interface SearxngApiService {
-    
+
     /**
      * Perform a web search
      * @param query The search query
@@ -75,17 +75,17 @@ data class SearxngInfoboxUrl(
  * Provides configured Retrofit instance for SearXNG API
  */
 object SearxngClient {
-    
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = true
     }
-    
+
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.HEADERS
     }
-    
+
     private fun createOkHttpClient(): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -94,7 +94,7 @@ object SearxngClient {
             .addInterceptor(loggingInterceptor)
             .build()
     }
-    
+
     /**
      * Create a new SearxngApiService with the specified base URL
      * @param serverIp The IP address of the SearXNG server
@@ -102,28 +102,28 @@ object SearxngClient {
      */
     fun createService(serverIp: String, port: Int = 8888): SearxngApiService {
         val baseUrl = "http://$serverIp:$port/"
-        
+
         val retrofit = Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(createOkHttpClient())
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-        
+
         return retrofit.create(SearxngApiService::class.java)
     }
-    
+
     /**
      * Format search results into a concise string for the AI
      */
     fun formatSearchResults(response: SearxngSearchResponse, maxResults: Int = 5): String {
         val sb = StringBuilder()
-        
+
         // Include any direct answers first
         if (response.answers.isNotEmpty()) {
             sb.appendLine("Direct Answer: ${response.answers.first()}")
             sb.appendLine()
         }
-        
+
         // Include infobox content if available
         response.infoboxes.firstOrNull()?.let { infobox ->
             infobox.content?.let { content ->
@@ -131,7 +131,7 @@ object SearxngClient {
                 sb.appendLine()
             }
         }
-        
+
         // Include top search results
         val topResults = response.results.take(maxResults)
         if (topResults.isNotEmpty()) {
@@ -144,7 +144,7 @@ object SearxngClient {
                 sb.appendLine()
             }
         }
-        
+
         return if (sb.isEmpty()) {
             "No results found."
         } else {

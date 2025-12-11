@@ -10,12 +10,12 @@ import com.localgrok.data.repository.SettingsRepository
  * Provides singleton instances of database and repositories
  */
 class LocalGrokApplication : Application() {
-    
+
     // Database
     val database: LocalGrokDatabase by lazy {
         LocalGrokDatabase.getDatabase(this)
     }
-    
+
     // Repositories
     val chatRepository: ChatRepository by lazy {
         ChatRepository(
@@ -23,14 +23,10 @@ class LocalGrokApplication : Application() {
             messageDao = database.messageDao()
         )
     }
-    
+
     val settingsRepository: SettingsRepository by lazy {
         SettingsRepository(this)
     }
-    
-    override fun onCreate() {
-        super.onCreate()
-        // Initialize app-level resources here if needed
-    }
+
 }
 

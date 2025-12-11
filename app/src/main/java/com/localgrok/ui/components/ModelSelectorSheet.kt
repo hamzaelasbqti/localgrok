@@ -42,30 +42,16 @@ val MODEL_OPTIONS = listOf(
     ModelOption(
         id = "lite",
         displayName = "Lite",
-        subtitle = "Supersonic speed",
-        icon = Icons.Outlined.DarkMode,
-        modelId = "qwen3:0.6b"
-    ),
-    ModelOption(
-        id = "fast",
-        displayName = "Fast",
         subtitle = "Quick responses",
-        icon = Icons.Filled.Bolt,
-        modelId = "qwen3:1.7b"
-    ),
-    ModelOption(
-        id = "mini",
-        displayName = "Mini",
-        subtitle = "Balanced reasoning",
-        icon = Icons.Filled.Lightbulb,
-        modelId = "qwen3:4b"
+        icon = Icons.Outlined.DarkMode,
+        modelId = "qwen3:0.6b-fp16"
     ),
     ModelOption(
         id = "pro",
         displayName = "Pro",
         subtitle = "Thinks hard",
         icon = Icons.Filled.RocketLaunch,
-        modelId = "qwen3:latest"
+        modelId = "qwen3:1.7b-fp16"
     )
 )
 
@@ -85,7 +71,7 @@ fun ModelSelectorSheet(
 ) {
     val colors = LocalAppColors.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -125,7 +111,7 @@ fun ModelSelectorSheet(
                         onDismiss()
                     }
                 )
-                
+
                 if (index < MODEL_OPTIONS.size - 1) {
                     HorizontalDivider(
                         color = colors.borderGrey.copy(alpha = 0.3f),
@@ -134,17 +120,17 @@ fun ModelSelectorSheet(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // "Models" footer link
             HorizontalDivider(
                 color = colors.borderGrey.copy(alpha = 0.5f),
                 thickness = 0.5.dp
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -201,9 +187,9 @@ private fun ModelOptionItem(
             tint = colors.textPrimary,
             modifier = Modifier.size(24.dp)
         )
-        
+
         Spacer(modifier = Modifier.width(16.dp))
-        
+
         // Title and subtitle
         Column(modifier = Modifier.weight(1f)) {
             Text(

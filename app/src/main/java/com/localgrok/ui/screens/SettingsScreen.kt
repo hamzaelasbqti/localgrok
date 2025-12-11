@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,35 +27,39 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.localgrok.ui.theme.AppTheme
 import com.localgrok.ui.theme.InterFont
 import com.localgrok.ui.theme.LocalAppColors
 import com.localgrok.ui.viewmodel.SettingsViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,16 +72,33 @@ fun SettingsScreen(
     val appTheme by viewModel.appTheme.collectAsState()
     val focusManager = LocalFocusManager.current
     val portFocusRequester = remember { FocusRequester() }
-    
+    val scope = rememberCoroutineScope()
+
     // Theme-aware colors
     val colors = LocalAppColors.current
-    
+
+    // Snackbar for toast messages
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Reload settings whenever the screen is shown to ensure fresh values
+    LaunchedEffect(Unit) {
+        viewModel.loadSettings()
+    }
+
+    // Show snackbar when settings are saved
+    LaunchedEffect(uiState.isSaved) {
+        if (uiState.isSaved) {
+            snackbarHostState.showSnackbar("Settings saved")
+            viewModel.clearMessage()
+        }
+    }
+
     // State for unsaved changes dialog
     var showUnsavedDialog by remember { mutableStateOf(false) }
-    
+
     // Debounce state to prevent rapid back button clicks
     var isBackNavigating by remember { mutableStateOf(false) }
-    
+
     // Handle back press with unsaved changes check and debounce
     val handleBack: () -> Unit = {
         if (!isBackNavigating) {
@@ -87,11 +110,11 @@ fun SettingsScreen(
             }
         }
     }
-    
+
     BackHandler {
         handleBack()
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -123,7 +146,11 @@ fun SettingsScreen(
                         color = if (uiState.isDirty) colors.accent else colors.textDim,
                         modifier = Modifier
                             .clickable(enabled = uiState.isDirty) {
-                                viewModel.saveSettings()
+                                viewModel.saveSettings { message ->
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(message)
+                                    }
+                                }
                             }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     )
@@ -134,33 +161,38 @@ fun SettingsScreen(
             )
         },
         containerColor = colors.background,
+        snackbarHost = { },
         modifier = modifier
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+            ) {
             // Section: Server Configuration
             SectionHeader(title = "SERVER")
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // Server IP Input
             GrokTextField(
                 label = "Server IP Address",
                 value = uiState.serverIp,
                 onValueChange = { viewModel.updateServerIp(it) },
-                placeholder = "192.168.1.50",
+                placeholder = "127.0.0.1",
                 keyboardType = KeyboardType.Uri,
                 imeAction = ImeAction.Next,
                 onImeAction = { portFocusRequester.requestFocus() }
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // Server Port Input
             GrokTextField(
                 label = "Ollama Port",
@@ -172,68 +204,50 @@ fun SettingsScreen(
                 onImeAction = { /* Focus next field */ },
                 focusRequester = portFocusRequester
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // SearXNG Port Input (for web search)
             GrokTextField(
                 label = "SearXNG Port (Web Search)",
                 value = uiState.searxngPort,
                 onValueChange = { viewModel.updateSearxngPort(it) },
-                placeholder = "8888",
+                placeholder = "8080",
                 keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Done,
                 onImeAction = { focusManager.clearFocus() }
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = "SearXNG provides web search capabilities. Uses same server IP as Ollama.",
                 fontFamily = InterFont,
                 fontSize = 12.sp,
                 color = colors.textSubtle
             )
-            
-            // Message display
-            uiState.message?.let { message ->
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = message,
-                    fontFamily = InterFont,
-                    fontSize = 13.sp,
-                    color = if (uiState.isSaved) colors.accent else colors.textSecondary
-                )
-            }
-            
+
             Spacer(modifier = Modifier.height(32.dp))
-            
+
             // Section: Appearance
             SectionHeader(title = "APPEARANCE")
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
                 text = "Theme",
                 fontFamily = InterFont,
                 fontSize = 13.sp,
                 color = colors.textSecondary
             )
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             // Theme Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                ThemeOptionButton(
-                    label = "Space",
-                    isSelected = appTheme == AppTheme.SPACE,
-                    onClick = { viewModel.setAppTheme(AppTheme.SPACE) },
-                    colors = colors,
-                    modifier = Modifier.weight(1f)
-                )
                 ThemeOptionButton(
                     label = "Dark",
                     isSelected = appTheme == AppTheme.DARK,
@@ -241,15 +255,22 @@ fun SettingsScreen(
                     colors = colors,
                     modifier = Modifier.weight(1f)
                 )
+                ThemeOptionButton(
+                    label = "Space",
+                    isSelected = appTheme == AppTheme.SPACE,
+                    onClick = { viewModel.setAppTheme(AppTheme.SPACE) },
+                    colors = colors,
+                    modifier = Modifier.weight(1f)
+                )
             }
-            
+
             Spacer(modifier = Modifier.height(32.dp))
-            
+
             // Section: About
             SectionHeader(title = "ABOUT")
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
                 text = "localgrok",
                 fontFamily = InterFont,
@@ -271,20 +292,33 @@ fun SettingsScreen(
                 fontSize = 13.sp,
                 color = colors.textSubtle
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
                 text = "Made with ❤️ by Scrumble",
                 fontFamily = InterFont,
                 fontSize = 13.sp,
                 color = colors.textSubtle
             )
-            
+
             Spacer(modifier = Modifier.height(32.dp))
         }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+            ) { snackbarData ->
+                Snackbar(
+                    snackbarData = snackbarData,
+                    containerColor = colors.darkGrey,
+                    contentColor = colors.textPrimary,
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
     }
-    
+
     // Unsaved changes dialog
     if (showUnsavedDialog) {
         AlertDialog(
@@ -310,6 +344,7 @@ fun SettingsScreen(
                     onClick = {
                         if (!isBackNavigating) {
                             isBackNavigating = true
+                            viewModel.loadSettings()
                             showUnsavedDialog = false
                             onNavigateBack()
                         }
@@ -369,7 +404,7 @@ fun ThemeOptionButton(
         colors.borderGrey.copy(alpha = 0.5f)
     }
     val textColor = if (isSelected) colors.textPrimary else colors.textSecondary
-    
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
@@ -438,7 +473,9 @@ fun GrokTextField(
                 .background(colors.darkGrey)
                 .border(
                     width = 1.dp,
-                    color = if (value.isNotEmpty()) colors.borderGrey else colors.borderGrey.copy(alpha = 0.5f),
+                    color = if (value.isNotEmpty()) colors.borderGrey else colors.borderGrey.copy(
+                        alpha = 0.5f
+                    ),
                     shape = RoundedCornerShape(12.dp)
                 )
                 .padding(horizontal = 16.dp, vertical = 14.dp),

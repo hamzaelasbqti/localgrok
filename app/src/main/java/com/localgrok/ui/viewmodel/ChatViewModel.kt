@@ -24,62 +24,62 @@ class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // State
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
-    
+
     private val _messages = MutableStateFlow<List<MessageEntity>>(emptyList())
     val messages: StateFlow<List<MessageEntity>> = _messages.asStateFlow()
-    
+
     private val _chats = MutableStateFlow<List<ChatEntity>>(emptyList())
     val chats: StateFlow<List<ChatEntity>> = _chats.asStateFlow()
-    
+
     private val _currentChat = MutableStateFlow<ChatEntity?>(null)
     val currentChat: StateFlow<ChatEntity?> = _currentChat.asStateFlow()
-    
+
     // Streaming state - updates immediately on each token for real-time display
     private val _streamingState = MutableStateFlow<StreamingMessageState?>(null)
     val streamingState: StateFlow<StreamingMessageState?> = _streamingState.asStateFlow()
-    
+
     // Reasoning content for the current streaming message
     private val _reasoningContent = MutableStateFlow<Map<Long, String>>(emptyMap())
     val reasoningContent: StateFlow<Map<Long, String>> = _reasoningContent.asStateFlow()
-    
+
     // Brain toggle state (Lightbulb) - controls reasoning and tool-enabled system prompt
     private val _brainToggleEnabled = MutableStateFlow(true)
     val brainToggleEnabled: StateFlow<Boolean> = _brainToggleEnabled.asStateFlow()
-    
-    private var currentModel: String = "qwen3:0.6b"
-    
+
+    private var currentModel: String = "qwen3:0.6b-fp16"
+
     // Jobs for cancelling previous flow collections
     private var chatCollectionJob: Job? = null
     private var messagesCollectionJob: Job? = null
     private var streamingJob: Job? = null
-    
-    
+
+
     init {
         loadChats()
         initializeServer()
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // Initialization
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     private fun initializeServer() {
         viewModelScope.launch {
             val serverIp = settingsRepository.serverIp.first()
             val serverPort = settingsRepository.serverPort.first()
             val searxngPort = settingsRepository.searxngPort.first()
             currentModel = settingsRepository.defaultModel.first()
-            
+
             _uiState.value = _uiState.value.copy(selectedModel = currentModel)
-            
-            if (serverIp != null) {
+
+            if (serverIp.isNotEmpty()) {
                 chatRepository.configureServer(serverIp, serverPort)
                 chatRepository.configureSearxng(serverIp, searxngPort)
                 checkConnection()
@@ -90,37 +90,37 @@ class ChatViewModel(
             }
         }
     }
-    
+
     fun refreshServerConnection() {
         viewModelScope.launch {
             val serverIp = settingsRepository.serverIp.first()
             val serverPort = settingsRepository.serverPort.first()
             val searxngPort = settingsRepository.searxngPort.first()
             currentModel = settingsRepository.defaultModel.first()
-            
+
             _uiState.value = _uiState.value.copy(selectedModel = currentModel)
-            
-            if (serverIp != null) {
+
+            if (serverIp.isNotEmpty()) {
                 chatRepository.configureServer(serverIp, serverPort)
                 chatRepository.configureSearxng(serverIp, searxngPort)
                 checkConnection()
             }
         }
     }
-    
+
     private suspend fun checkConnection() {
         _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.Connecting)
-        
+
         val isConnected = chatRepository.checkServerConnection()
         _uiState.value = _uiState.value.copy(
             connectionStatus = if (isConnected) ConnectionStatus.Connected else ConnectionStatus.Error
         )
-        
+
         if (isConnected) {
             loadModels()
         }
     }
-    
+
     private suspend fun loadModels() {
         chatRepository.listModels().onSuccess { models ->
             _uiState.value = _uiState.value.copy(availableModels = models)
@@ -129,11 +129,11 @@ class ChatViewModel(
             }
         }
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // Chat Management
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     private fun loadChats() {
         viewModelScope.launch {
             chatRepository.getAllChats().collect { chatList ->
@@ -141,7 +141,7 @@ class ChatViewModel(
             }
         }
     }
-    
+
     fun createNewChat() {
         viewModelScope.launch {
             val chatId = chatRepository.createChat(
@@ -151,26 +151,26 @@ class ChatViewModel(
             selectChat(chatId)
         }
     }
-    
+
     fun selectChat(chatId: Long) {
         chatCollectionJob?.cancel()
         messagesCollectionJob?.cancel()
-        
+
         chatCollectionJob = viewModelScope.launch {
             chatRepository.getChatById(chatId).collect { chat ->
                 _currentChat.value = chat
             }
         }
-        
+
         messagesCollectionJob = viewModelScope.launch {
             chatRepository.getMessagesForChat(chatId).collect { messageList ->
                 _messages.value = messageList
-                
+
                 // Load persisted reasoning content from messages
                 val persistedReasoning = messageList
                     .filter { it.reasoningContent.isNotBlank() }
                     .associate { it.id to it.reasoningContent }
-                
+
                 // Merge with existing streaming reasoning (don't overwrite active reasoning)
                 val currentReasoning = _reasoningContent.value
                 _reasoningContent.value = persistedReasoning + currentReasoning.filterKeys { key ->
@@ -180,7 +180,7 @@ class ChatViewModel(
             }
         }
     }
-    
+
     fun deleteChat(chatId: Long) {
         viewModelScope.launch {
             chatRepository.deleteChat(chatId)
@@ -190,7 +190,7 @@ class ChatViewModel(
             }
         }
     }
-    
+
     fun deleteAllChats() {
         viewModelScope.launch {
             chatRepository.deleteAllChats()
@@ -198,11 +198,11 @@ class ChatViewModel(
             _messages.value = emptyList()
         }
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // Message Handling with Real-Time Streaming
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     /**
      * Send a message with optional model override
      * Uses real-time streaming state for immediate UI updates
@@ -215,16 +215,16 @@ class ChatViewModel(
     ) {
         if (content.isBlank()) return
         if (_uiState.value.isGenerating) return
-        
+
         val useModel = model ?: currentModel
         val thinkEnabled = _brainToggleEnabled.value
         val systemPrompt = SystemPromptBuilder.buildSystemPrompt(_brainToggleEnabled.value)
-        
+
         streamingJob = viewModelScope.launch {
             // Create chat if needed
             var chatId = _currentChat.value?.id
             val isNewChat = chatId == null
-            
+
             if (isNewChat) {
                 chatId = chatRepository.createChat(
                     title = content.take(50),
@@ -233,32 +233,34 @@ class ChatViewModel(
                 selectChat(chatId)
                 kotlinx.coroutines.delay(50)
             }
-            
+
             // Update title if first message
             val currentTitle = _currentChat.value?.title
             if (currentTitle == "New Chat" || _messages.value.isEmpty()) {
                 chatRepository.updateChatTitle(chatId!!, content.take(50))
             }
-            
+
             // Add user message
             chatRepository.addUserMessage(chatId!!, content)
-            
+
             // Create placeholder for assistant response
             val assistantMessageId = chatRepository.createAssistantMessage(chatId)
-            
+
             // Initialize streaming state for immediate UI updates
             _streamingState.value = StreamingMessageState(
                 messageId = assistantMessageId,
                 content = "",
                 isThinking = thinkEnabled,
-                isStreaming = true
+                isStreaming = true,
+                toolUsed = false,
+                toolDisplayName = null
             )
-            
+
             _uiState.value = _uiState.value.copy(
                 isGenerating = true,
                 error = null
             )
-            
+
             // Start streaming with tool call support
             streamWithToolSupport(
                 chatId = chatId,
@@ -269,12 +271,44 @@ class ChatViewModel(
             )
         }
     }
-    
+
+    /**
+     * Show an assistant-style reminder when no server is configured
+     */
+    fun sendSetupReminder() {
+        if (_uiState.value.isGenerating) return
+
+        viewModelScope.launch {
+            val reminder = "Set up server in settings to start chatting."
+            var chatId = _currentChat.value?.id
+
+            if (chatId == null) {
+                chatId = chatRepository.createChat(
+                    title = "Setup required",
+                    model = currentModel
+                )
+                selectChat(chatId)
+                kotlinx.coroutines.delay(50)
+            }
+
+            val assistantMessageId = chatRepository.createAssistantMessage(chatId!!)
+            chatRepository.updateMessageState(
+                messageId = assistantMessageId,
+                content = reminder,
+                isStreaming = false,
+                isThinking = false
+            )
+
+            _streamingState.value = null
+            _uiState.value = _uiState.value.copy(isGenerating = false, error = null)
+        }
+    }
+
     companion object {
         // Only allow a single tool call per prompt - small models struggle with multi-tool calling
         private const val MAX_TOOL_CALLS = 1
     }
-    
+
     /**
      * Internal function to handle streaming with tool call support
      * Can be called recursively when a tool call is executed
@@ -286,13 +320,18 @@ class ChatViewModel(
         systemPrompt: String?,
         thinkEnabled: Boolean,
         toolResultContext: String? = null,  // Tool result to inject if continuing after tool call
-        toolCallCount: Int = 0  // Track how many tools have been called
+        toolCallCount: Int = 0,  // Track how many tools have been called
+        toolUsed: Boolean = false,  // Track if a tool was used for this message
+        toolUsedDisplayName: String? = null  // Human readable tool label if used
     ) {
+        var hasUsedTool = toolUsed || toolResultContext != null
+        var currentToolDisplayName = toolUsedDisplayName
+
         // Get messages for API context
         var messagesForApi = chatRepository.getMessagesForChat(chatId).first()
             .filter { it.id != assistantMessageId }
             .toMutableList()
-        
+
         // Build effective system prompt with tool results
         val effectiveSystemPrompt = if (toolResultContext != null) {
             val basePrompt = systemPrompt ?: ""
@@ -300,14 +339,14 @@ class ChatViewModel(
         } else {
             systemPrompt
         }
-        
+
         var contentResponse = ""
         var reasoningResponse = ""
         var hasStartedContent = false
         var toolCallDetected = false
         var toolCallEarlyDetected = false  // True when we detect tool call pattern starting
         var detectedToolCall: ToolCall? = null
-        
+
         chatRepository.streamChatWithCallback(
             model = model,
             messages = messagesForApi,
@@ -316,16 +355,17 @@ class ChatViewModel(
             onThinkingToken = { token ->
                 // Accumulate reasoning content
                 reasoningResponse += token
-                
+
                 // Update reasoning content map for this message
-                _reasoningContent.value = _reasoningContent.value + (assistantMessageId to reasoningResponse)
-                
+                _reasoningContent.value =
+                    _reasoningContent.value + (assistantMessageId to reasoningResponse)
+
                 // Update streaming state immediately - still in thinking phase
                 _streamingState.value = _streamingState.value?.copy(
                     isThinking = true,
                     isStreaming = true
                 )
-                
+
                 // Persist reasoning content to database in background
                 chatRepository.updateReasoningContent(assistantMessageId, reasoningResponse)
             },
@@ -335,12 +375,15 @@ class ChatViewModel(
                     hasStartedContent = true
                 }
                 contentResponse += token
-                
+
                 // EARLY DETECTION: Check if response is starting with tool call pattern
                 // This happens before we have the complete tool call
-                if (!toolCallEarlyDetected && !toolCallDetected && chatRepository.isStartingWithToolCall(contentResponse)) {
+                if (!toolCallEarlyDetected && !toolCallDetected && chatRepository.isStartingWithToolCall(
+                        contentResponse
+                    )
+                ) {
                     toolCallEarlyDetected = true
-                    
+
                     // Immediately show tool execution indicator - hide all content
                     withContext(Dispatchers.Main.immediate) {
                         _streamingState.value = StreamingMessageState(
@@ -349,17 +392,19 @@ class ChatViewModel(
                             isThinking = false,
                             isStreaming = true,
                             isExecutingTool = true,
-                            toolDisplayName = null  // Tool not known yet
+                            toolDisplayName = null,  // Tool not known yet
+                            toolUsed = hasUsedTool
                         )
                     }
                 }
-                
+
                 // Check for complete tool call in accumulated response
                 val toolCall = chatRepository.detectToolCall(contentResponse)
                 if (toolCall != null && !toolCallDetected) {
                     toolCallDetected = true
                     detectedToolCall = toolCall
-                    
+                    currentToolDisplayName = toolCall.displayName
+
                     // Update with the tool display name now that we know it
                     withContext(Dispatchers.Main.immediate) {
                         _streamingState.value = StreamingMessageState(
@@ -368,104 +413,121 @@ class ChatViewModel(
                             isThinking = false,
                             isStreaming = true,
                             isExecutingTool = true,
-                            toolDisplayName = toolCall.displayName
+                            toolDisplayName = toolCall.displayName,
+                            toolUsed = true
                         )
                     }
-                    
+
                     // We'll handle tool execution in onComplete
                     return@streamChatWithCallback
                 }
-                
+
                 // Only update UI with content if NOT in tool call mode
                 if (!toolCallEarlyDetected && !toolCallDetected) {
                     // Clean any tool artifacts from streaming content before displaying
                     val cleanedContent = chatRepository.cleanToolArtifacts(contentResponse)
-                    
+
                     // Update streaming state IMMEDIATELY on main thread
                     withContext(Dispatchers.Main.immediate) {
                         _streamingState.value = StreamingMessageState(
                             messageId = assistantMessageId,
                             content = cleanedContent,
                             isThinking = false,
-                            isStreaming = true
+                            isStreaming = true,
+                            toolUsed = hasUsedTool,
+                            toolDisplayName = currentToolDisplayName
                         )
                     }
-                    
+
                     // Update database in background (for persistence)
                     chatRepository.updateMessageState(
                         messageId = assistantMessageId,
                         content = cleanedContent,
                         isStreaming = true,
-                        isThinking = false
+                        isThinking = false,
+                        toolUsed = hasUsedTool,
+                        toolDisplayName = currentToolDisplayName ?: ""
                     )
                 }
             },
             onComplete = {
-                viewModelScope.launch {
-                    // Check if we detected a tool call during streaming
-                    if (toolCallDetected && detectedToolCall != null) {
-                        // Execute the tool
-                        val toolResult = chatRepository.executeTool(detectedToolCall!!)
-                        
-                        // Get content before tool call (should be empty for tool-first responses)
-                        val contentBeforeToolCall = chatRepository.getContentBeforeToolCall(contentResponse)
-                        
-                        // Update the message with content so far
-                        chatRepository.updateMessageState(
-                            messageId = assistantMessageId,
-                            content = contentBeforeToolCall,
-                            isStreaming = true,
-                            isThinking = false
-                        )
-                        
-                        // Continue the conversation with tool results
-                        // We'll call the API again with the tool result injected
-                        streamWithToolSupport(
-                            chatId = chatId,
-                            assistantMessageId = assistantMessageId,
-                            model = model,
-                            systemPrompt = systemPrompt,
-                            thinkEnabled = thinkEnabled,
-                            toolResultContext = toolResult,
-                            toolCallCount = toolCallCount + 1
-                        )
-                    } else {
-                        // No tool call - normal completion
-                        // Clean any tool artifacts from the response before displaying
-                        val cleanedContent = chatRepository.cleanToolArtifacts(contentResponse)
-                        // If we thought it was a tool call but couldn't parse/execute, avoid showing nothing
-                        val finalContent = if (cleanedContent.isNotBlank()) {
-                            cleanedContent
-                        } else if (toolCallEarlyDetected) {
-                            "I couldn't run that tool. Please try again without it."
-                        } else {
-                            cleanedContent
-                        }
-                        
-                        // Final update to streaming state
-                        _streamingState.value = StreamingMessageState(
-                            messageId = assistantMessageId,
-                            content = finalContent,
-                            isThinking = false,
-                            isStreaming = false
-                        )
-                        
-                        // Persist final state to database (including reasoning content)
-                        chatRepository.updateMessageStateWithReasoning(
-                            messageId = assistantMessageId,
-                            content = finalContent,
-                            isStreaming = false,
-                            isThinking = false,
-                            reasoningContent = reasoningResponse
-                        )
-                        
-                        _uiState.value = _uiState.value.copy(isGenerating = false)
-                        
-                        // Clear streaming state after a brief delay to allow UI to settle
-                        kotlinx.coroutines.delay(100)
-                        _streamingState.value = null
-                    }
+                // Continue in the same coroutine so stopGeneration can cancel all steps
+                if (toolCallDetected && detectedToolCall != null) {
+                    // Execute the tool
+                    val toolResult = chatRepository.executeTool(detectedToolCall!!)
+
+                    // Get content before tool call (should be empty for tool-first responses)
+                    val contentBeforeToolCall =
+                        chatRepository.getContentBeforeToolCall(contentResponse)
+
+                    // Update the message with content so far
+                    chatRepository.updateMessageState(
+                        messageId = assistantMessageId,
+                        content = contentBeforeToolCall,
+                        isStreaming = true,
+                        isThinking = false,
+                        toolUsed = true,
+                        toolDisplayName = currentToolDisplayName ?: detectedToolCall?.displayName
+                        ?: ""
+                    )
+                    hasUsedTool = true
+                    currentToolDisplayName = currentToolDisplayName ?: detectedToolCall?.displayName
+
+                    // Continue the conversation with tool results without spawning a new job
+                    streamWithToolSupport(
+                        chatId = chatId,
+                        assistantMessageId = assistantMessageId,
+                        model = model,
+                        systemPrompt = systemPrompt,
+                        thinkEnabled = thinkEnabled,
+                        toolResultContext = toolResult,
+                        toolCallCount = toolCallCount + 1,
+                        toolUsed = true,
+                        toolUsedDisplayName = currentToolDisplayName
+                    )
+                    return@streamChatWithCallback
                 }
+
+                // No tool call - normal completion
+                // Clean any tool artifacts from the response before displaying
+                val cleanedContent = chatRepository.cleanToolArtifacts(contentResponse)
+                // If we thought it was a tool call but couldn't parse/execute, avoid showing nothing
+                val finalContent = if (cleanedContent.isNotBlank()) {
+                    cleanedContent
+                } else if (toolCallEarlyDetected) {
+                    "I couldn't run that tool. Please try again without it."
+                } else {
+                    cleanedContent
+                }
+
+                // Final update to streaming state
+                withContext(Dispatchers.Main.immediate) {
+                    _streamingState.value = StreamingMessageState(
+                        messageId = assistantMessageId,
+                        content = finalContent,
+                        isThinking = false,
+                        isStreaming = false,
+                        toolUsed = hasUsedTool,
+                        toolDisplayName = currentToolDisplayName
+                    )
+                }
+
+                // Persist final state to database (including reasoning content)
+                chatRepository.updateMessageStateWithReasoning(
+                    messageId = assistantMessageId,
+                    content = finalContent,
+                    isStreaming = false,
+                    isThinking = false,
+                    reasoningContent = reasoningResponse,
+                    toolUsed = hasUsedTool,
+                    toolDisplayName = currentToolDisplayName ?: ""
+                )
+
+                _uiState.value = _uiState.value.copy(isGenerating = false)
+
+                // Clear streaming state after a brief delay to allow UI to settle
+                kotlinx.coroutines.delay(100)
+                _streamingState.value = null
             },
             onError = { error ->
                 viewModelScope.launch {
@@ -474,7 +536,9 @@ class ChatViewModel(
                         messageId = assistantMessageId,
                         content = "Error: $error",
                         isStreaming = false,
-                        isThinking = false
+                        isThinking = false,
+                        toolUsed = hasUsedTool,
+                        toolDisplayName = currentToolDisplayName ?: ""
                     )
                     _uiState.value = _uiState.value.copy(
                         isGenerating = false,
@@ -484,35 +548,37 @@ class ChatViewModel(
             }
         )
     }
-    
+
     /**
      * Stop the current generation
      */
     fun stopGeneration() {
         streamingJob?.cancel()
         streamingJob = null
-        
+
         viewModelScope.launch {
             // Get the current streaming message ID
             val currentMessageId = _streamingState.value?.messageId
             val currentContent = _streamingState.value?.content ?: ""
-            
+
             if (currentMessageId != null) {
                 // Save whatever content we have so far
                 chatRepository.updateMessageState(
                     messageId = currentMessageId,
                     content = currentContent,
                     isStreaming = false,
-                    isThinking = false
+                    isThinking = false,
+                    toolUsed = _streamingState.value?.toolUsed ?: false,
+                    toolDisplayName = _streamingState.value?.toolDisplayName ?: ""
                 )
             }
-            
+
             // Clear streaming state
             _streamingState.value = null
             _uiState.value = _uiState.value.copy(isGenerating = false)
         }
     }
-    
+
     fun setModel(model: String) {
         currentModel = model
         _uiState.value = _uiState.value.copy(selectedModel = model)
@@ -520,11 +586,11 @@ class ChatViewModel(
             settingsRepository.setDefaultModel(model)
         }
     }
-    
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
-    
+
     /**
      * Toggle the brain toggle (Lightbulb) state
      * Controls reasoning mode and tool-enabled system prompt
@@ -554,6 +620,7 @@ data class StreamingMessageState(
     val content: String,
     val isThinking: Boolean,
     val isStreaming: Boolean,
+    val toolUsed: Boolean = false,
     val isExecutingTool: Boolean = false,
     val toolDisplayName: String? = null  // e.g., "Searching...", "Checking time..."
 )

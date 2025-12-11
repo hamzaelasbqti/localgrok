@@ -17,68 +17,75 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  * Repository for managing user settings via DataStore
  */
 class SettingsRepository(private val context: Context) {
-    
+
     companion object {
         private val SERVER_IP_KEY = stringPreferencesKey("server_ip")
         private val SERVER_PORT_KEY = intPreferencesKey("server_port")
         private val SEARXNG_PORT_KEY = intPreferencesKey("searxng_port")
         private val DEFAULT_MODEL_KEY = stringPreferencesKey("default_model")
         private val APP_THEME_KEY = stringPreferencesKey("app_theme")
-        
+
         const val DEFAULT_PORT = 11434
-        const val DEFAULT_SEARXNG_PORT = 8888
-        const val DEFAULT_MODEL = "llama3.2"
+        const val DEFAULT_SEARXNG_PORT = 8080
+        const val DEFAULT_MODEL = "qwen3:0.6b-fp16"
     }
-    
+
     /**
      * Get the server IP address
      */
-    val serverIp: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[SERVER_IP_KEY]
+    val serverIp: Flow<String> = context.dataStore.data.map { preferences ->
+        val ip = preferences[SERVER_IP_KEY]
+        // Treat empty strings as null to prevent crashes, default to loopback
+        if (ip.isNullOrBlank()) "127.0.0.1" else ip
     }
-    
+
     /**
      * Get the server port
      */
     val serverPort: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[SERVER_PORT_KEY] ?: DEFAULT_PORT
     }
-    
+
     /**
      * Get the SearXNG port (runs on same server as Ollama)
      */
     val searxngPort: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[SEARXNG_PORT_KEY] ?: DEFAULT_SEARXNG_PORT
     }
-    
+
     /**
      * Get the default model name
      */
     val defaultModel: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[DEFAULT_MODEL_KEY] ?: DEFAULT_MODEL
     }
-    
+
     /**
      * Get the app theme
      */
     val appTheme: Flow<AppTheme> = context.dataStore.data.map { preferences ->
-        val themeName = preferences[APP_THEME_KEY] ?: AppTheme.SPACE.name
+        val themeName = preferences[APP_THEME_KEY] ?: AppTheme.DARK.name
         try {
             AppTheme.valueOf(themeName)
         } catch (e: IllegalArgumentException) {
-            AppTheme.SPACE
+            AppTheme.DARK
         }
     }
-    
+
     /**
      * Save server IP address
      */
     suspend fun setServerIp(ip: String) {
         context.dataStore.edit { preferences ->
-            preferences[SERVER_IP_KEY] = ip
+            // Store empty string as null to prevent crashes
+            if (ip.isBlank()) {
+                preferences.remove(SERVER_IP_KEY)
+            } else {
+                preferences[SERVER_IP_KEY] = ip.trim()
+            }
         }
     }
-    
+
     /**
      * Save server port
      */
@@ -87,7 +94,7 @@ class SettingsRepository(private val context: Context) {
             preferences[SERVER_PORT_KEY] = port
         }
     }
-    
+
     /**
      * Save SearXNG port
      */
@@ -96,7 +103,7 @@ class SettingsRepository(private val context: Context) {
             preferences[SEARXNG_PORT_KEY] = port
         }
     }
-    
+
     /**
      * Save default model
      */
@@ -105,7 +112,7 @@ class SettingsRepository(private val context: Context) {
             preferences[DEFAULT_MODEL_KEY] = model
         }
     }
-    
+
     /**
      * Save app theme
      */
@@ -114,7 +121,7 @@ class SettingsRepository(private val context: Context) {
             preferences[APP_THEME_KEY] = theme.name
         }
     }
-    
+
     /**
      * Clear all settings
      */

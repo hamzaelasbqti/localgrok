@@ -21,9 +21,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.DarkMode
@@ -52,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import kotlin.math.roundToInt
 import com.localgrok.ui.theme.InterFont
 import com.localgrok.ui.theme.LocalAppColors
 import com.localgrok.ui.theme.LocalGrokColors
@@ -69,30 +66,16 @@ val MODEL_OPTIONS = listOf(
     ModelOption(
         id = "lite",
         displayName = "Lite",
-        subtitle = "Supersonic speed",
-        icon = Icons.Outlined.DarkMode,
-        modelId = "qwen3:0.6b"
-    ),
-    ModelOption(
-        id = "fast",
-        displayName = "Fast",
         subtitle = "Quick responses",
-        icon = Icons.Default.Bolt,
-        modelId = "qwen3:1.7b"
-    ),
-    ModelOption(
-        id = "mini",
-        displayName = "Mini",
-        subtitle = "Balanced reasoning",
-        icon = Icons.Default.Lightbulb,
-        modelId = "qwen3:4b"
+        icon = Icons.Outlined.DarkMode,
+        modelId = "qwen3:0.6b-fp16"
     ),
     ModelOption(
         id = "pro",
         displayName = "Pro",
         subtitle = "Thinks hard",
         icon = Icons.Default.RocketLaunch,
-        modelId = "qwen3:latest"
+        modelId = "qwen3:1.7b-fp16"
     )
 )
 
@@ -110,19 +93,20 @@ fun UnifiedInputBar(
     onBrainToggleChanged: () -> Unit = {},
     isGenerating: Boolean = false,
     enabled: Boolean = true,
+    allowEmptySend: Boolean = false,
     colors: LocalGrokColors = LocalAppColors.current,
     modifier: Modifier = Modifier
 ) {
     var showModelDropdown by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val interactionSource = remember { MutableInteractionSource() }
-    
+
     // Outer container - padding only, no background
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .padding(top = 8.dp, bottom = 10.dp)
+            .padding(horizontal = 4.dp)
+            .padding(top = 8.dp, bottom = 4.dp)
     ) {
         // Content with rounded corners, background, and border
         // Tapping anywhere in this capsule focuses the text field
@@ -157,13 +141,15 @@ fun UnifiedInputBar(
                     fontSize = 16.sp
                 ),
                 // Hide cursor when empty (so it doesn't show "| Ask anything"), show when typing
-                cursorBrush = if (value.isEmpty()) SolidColor(Color.Transparent) else SolidColor(colors.textPrimary),
+                cursorBrush = if (value.isEmpty()) SolidColor(Color.Transparent) else SolidColor(
+                    colors.textPrimary
+                ),
                 keyboardOptions = KeyboardOptions(
                     imeAction = ImeAction.Send
                 ),
                 keyboardActions = KeyboardActions(
                     onSend = {
-                        if (value.isNotBlank() && enabled) {
+                        if ((value.isNotBlank() || allowEmptySend) && enabled) {
                             onSend()
                         }
                     }
@@ -189,7 +175,7 @@ fun UnifiedInputBar(
                     }
                 }
             )
-            
+
             // Row 2: Brain toggle, Model pill, Send button
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -216,13 +202,13 @@ fun UnifiedInputBar(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                
+
                 // Spacer to push model pill and send/stop button to the right
                 Spacer(modifier = Modifier.weight(1f))
-                
+
                 // Model Selector Pill with Dropdown
                 val density = LocalDensity.current
-                
+
                 Box {
                     Row(
                         modifier = Modifier
@@ -255,7 +241,7 @@ fun UnifiedInputBar(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                    
+
                     // Floating Dropdown Menu - positioned above the pill
                     if (showModelDropdown) {
                         ModelSelectorDropdown(
@@ -270,9 +256,9 @@ fun UnifiedInputBar(
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
+
                 // Send/Stop Button
                 if (isGenerating) {
                     // Stop Button - shown while generating
@@ -297,14 +283,16 @@ fun UnifiedInputBar(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(if (value.isNotBlank() && enabled) colors.textPrimary else colors.mediumGrey)
-                            .clickable(enabled = value.isNotBlank() && enabled) { onSend() },
+                            .background(
+                                if ((value.isNotBlank() || allowEmptySend) && enabled) colors.textPrimary else colors.mediumGrey
+                            )
+                            .clickable(enabled = (value.isNotBlank() || allowEmptySend) && enabled) { onSend() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
-                            tint = if (value.isNotBlank() && enabled) colors.background else colors.textDim,
+                            tint = if ((value.isNotBlank() || allowEmptySend) && enabled) colors.background else colors.textDim,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -322,11 +310,11 @@ fun ModelSelectorDropdown(
     density: androidx.compose.ui.unit.Density,
     colors: LocalGrokColors = LocalAppColors.current
 ) {
-    // Menu height estimate: ~60dp per item * 4 items + padding
-    val menuHeight = with(density) { 260.dp.roundToPx() }
+    // Menu height estimate: ~60dp per item * 2 items + padding
+    val menuHeight = with(density) { 130.dp.roundToPx() }
     // Gap to clear the input bar and provide visual separation
     val inputBarOffset = with(density) { 60.dp.roundToPx() }
-    
+
     Popup(
         onDismissRequest = onDismissRequest,
         alignment = Alignment.TopEnd,
@@ -355,7 +343,7 @@ fun ModelSelectorDropdown(
                     onClick = { onModelSelected(model) },
                     colors = colors
                 )
-                
+
                 if (index < MODEL_OPTIONS.size - 1) {
                     HorizontalDivider(
                         color = colors.borderGrey.copy(alpha = 0.3f),
@@ -390,9 +378,9 @@ private fun ModelDropdownItem(
             tint = colors.textPrimary,
             modifier = Modifier.size(22.dp)
         )
-        
+
         Spacer(modifier = Modifier.width(16.dp))
-        
+
         // Title and subtitle
         Column(modifier = Modifier.weight(1f)) {
             Text(

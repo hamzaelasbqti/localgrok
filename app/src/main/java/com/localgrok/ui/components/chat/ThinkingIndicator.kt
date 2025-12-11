@@ -56,7 +56,7 @@ private fun containsToolArtifacts(content: String): Boolean {
 
 /**
  * Collapsible thinking section with clickable header and expandable reasoning content
- * 
+ *
  * Note: This component will render nothing if tool artifacts are detected in the reasoning content
  * or message content, as tool status should take priority over the "Thought" label.
  */
@@ -76,7 +76,7 @@ fun CollapsibleThinkingSection(
         return
     }
     val infiniteTransition = rememberInfiniteTransition(label = "thinking_pulse")
-    
+
     // Pulse animation for the "Thinking..." text while actively thinking
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
@@ -87,7 +87,7 @@ fun CollapsibleThinkingSection(
         ),
         label = "thinking_alpha"
     )
-    
+
     Column(modifier = modifier) {
         // Clickable header - matches ToolStatus visual style exactly
         Row(
@@ -110,9 +110,9 @@ fun CollapsibleThinkingSection(
                         }
                     }
             )
-            
+
             Spacer(modifier = Modifier.width(8.dp))
-            
+
             // Text matching ToolStatus typography exactly
             Text(
                 text = if (isThinking) "Thinking..." else if (reasoningContent.isNotBlank()) "Thought" else "Thinking",
@@ -126,7 +126,7 @@ fun CollapsibleThinkingSection(
                     }
                 }
             )
-            
+
             // Show expand indicator if there's reasoning content
             if (reasoningContent.isNotBlank()) {
                 Spacer(modifier = Modifier.width(8.dp))
@@ -138,7 +138,7 @@ fun CollapsibleThinkingSection(
                 )
             }
         }
-        
+
         // Expandable reasoning content
         AnimatedVisibility(
             visible = isExpanded && reasoningContent.isNotBlank(),

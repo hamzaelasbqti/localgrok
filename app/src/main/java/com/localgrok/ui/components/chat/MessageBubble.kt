@@ -1,11 +1,14 @@
 package com.localgrok.ui.components.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,16 +16,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Share
@@ -76,12 +75,14 @@ fun UserMessageBubble(
         Box(
             modifier = Modifier
                 .widthIn(max = 300.dp)
-                .clip(RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 4.dp,
-                    bottomStart = 16.dp,
-                    bottomEnd = 16.dp
-                ))
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 4.dp,
+                        bottomStart = 16.dp,
+                        bottomEnd = 16.dp
+                    )
+                )
                 .background(colors.userBubble)
                 .padding(14.dp)
         ) {
@@ -108,7 +109,7 @@ fun AssistantMessageBubble(
 ) {
     val context = LocalContext.current
     val colors = LocalAppColors.current
-    
+
     // Derive the response status from message state
     val responseStatus by remember(message.isStreaming, message.isThinking, message.content) {
         derivedStateOf {
@@ -119,14 +120,14 @@ fun AssistantMessageBubble(
             }
         }
     }
-    
+
     // Track previous status to detect transitions for animation
     var previousStatus by remember { mutableStateOf(responseStatus) }
     var showThinkingIndicator by remember { mutableStateOf(responseStatus == ResponseStatus.THINKING) }
-    
+
     // State for expanding/collapsing reasoning content
     var isReasoningExpanded by remember { mutableStateOf(false) }
-    
+
     // Handle status transitions
     LaunchedEffect(responseStatus) {
         when {
@@ -141,7 +142,7 @@ fun AssistantMessageBubble(
         }
         previousStatus = responseStatus
     }
-    
+
     // Close reasoning dropdown when tool execution starts
     // This ensures it stays closed after search completes
     LaunchedEffect(isExecutingTool) {
@@ -149,7 +150,7 @@ fun AssistantMessageBubble(
             isReasoningExpanded = false
         }
     }
-    
+
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -161,42 +162,67 @@ fun AssistantMessageBubble(
             // Helper function to detect tool artifacts in content
             fun containsToolArtifacts(content: String): Boolean {
                 return content.contains("<tool_result>", ignoreCase = true) ||
-                       content.contains("</tool_result>", ignoreCase = true) ||
-                       content.contains("<tool_call>", ignoreCase = true) ||
-                       content.contains("</tool_call>", ignoreCase = true) ||
-                       content.contains("Search results:", ignoreCase = true) ||
-                       content.contains("Current date and time:", ignoreCase = true)
+                        content.contains("</tool_result>", ignoreCase = true) ||
+                        content.contains("<tool_call>", ignoreCase = true) ||
+                        content.contains("</tool_call>", ignoreCase = true) ||
+                        content.contains("Search results:", ignoreCase = true) ||
+                        content.contains("Current date and time:", ignoreCase = true)
             }
-            
+
+            val persistedToolUsed = message.toolUsed
+            val persistedToolDisplayName = message.toolDisplayName.takeIf { it.isNotBlank() }
+
             // Detect if a tool was used by checking message content for tool result patterns
             // This includes <tool_result> tags and other tool indicators
-            val toolWasUsed = remember(message.content, toolDisplayName, reasoningContent) {
+            val toolWasUsed = remember(
+                message.content,
+                toolDisplayName,
+                reasoningContent,
+                persistedToolUsed,
+                persistedToolDisplayName
+            ) {
                 toolDisplayName != null ||
-                containsToolArtifacts(message.content) ||
-                containsToolArtifacts(reasoningContent)
+                        persistedToolUsed ||
+                        persistedToolDisplayName != null ||
+                        containsToolArtifacts(message.content) ||
+                        containsToolArtifacts(reasoningContent)
             }
-            
+
             // Determine which tool was used from content or displayName
-            val detectedToolName = remember(message.content, toolDisplayName) {
-                when {
-                    toolDisplayName != null -> toolDisplayName
-                    message.content.contains("Search results:", ignoreCase = true) ||
-                    message.content.contains("<tool_result>", ignoreCase = true) && 
-                    (message.content.contains("Search", ignoreCase = true) || 
-                     message.content.contains("web", ignoreCase = true)) -> "Searching..."
-                    message.content.contains("Current date and time:", ignoreCase = true) ||
-                    (message.content.contains("<tool_result>", ignoreCase = true) && 
-                     (message.content.contains("time", ignoreCase = true) || 
-                      message.content.contains("date", ignoreCase = true) ||
-                      message.content.contains("calendar", ignoreCase = true))) -> "Checking time..."
-                    else -> null
+            val detectedToolName =
+                remember(message.content, toolDisplayName, persistedToolDisplayName) {
+                    val displayName = toolDisplayName ?: persistedToolDisplayName
+                    when {
+                        displayName != null -> displayName
+                        toolWasUsed -> "Completed"
+                        message.content.contains("Search results:", ignoreCase = true) ||
+                                message.content.contains("<tool_result>", ignoreCase = true) &&
+                                (message.content.contains("Search", ignoreCase = true) ||
+                                        message.content.contains(
+                                            "web",
+                                            ignoreCase = true
+                                        )) -> "Searching..."
+
+                        message.content.contains("Current date and time:", ignoreCase = true) ||
+                                (message.content.contains("<tool_result>", ignoreCase = true) &&
+                                        (message.content.contains("time", ignoreCase = true) ||
+                                                message.content.contains(
+                                                    "date",
+                                                    ignoreCase = true
+                                                ) ||
+                                                message.content.contains(
+                                                    "calendar",
+                                                    ignoreCase = true
+                                                ))) -> "Checking time..."
+
+                        else -> null
+                    }
                 }
-            }
-            
+
             // Tool execution indicator - shown when executing or when completed
             if (isExecutingTool) {
                 // Active tool execution
-                com.localgrok.ui.components.chat.ToolExecutionIndicator(
+                ToolExecutionIndicator(
                     displayText = toolDisplayName ?: "Working...",
                     isCompleted = false,
                     colors = colors
@@ -205,14 +231,14 @@ fun AssistantMessageBubble(
                 return@Row
             } else if (toolWasUsed && responseStatus == ResponseStatus.COMPLETE && detectedToolName != null) {
                 // Completed tool execution - show past tense
-                com.localgrok.ui.components.chat.ToolExecutionIndicator(
+                ToolExecutionIndicator(
                     displayText = detectedToolName,
                     isCompleted = true,
                     colors = colors
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            
+
             // Thinking indicator - clickable to expand reasoning
             // Logic flow:
             // 1. If actively thinking, always show "Thinking..." (regardless of tool usage)
@@ -227,9 +253,9 @@ fun AssistantMessageBubble(
                 // Otherwise don't show
                 else -> false
             }
-            
+
             if (showThinkingSection) {
-                com.localgrok.ui.components.chat.CollapsibleThinkingSection(
+                CollapsibleThinkingSection(
                     isThinking = showThinkingIndicator,
                     reasoningContent = reasoningContent,
                     messageContent = message.content,
@@ -239,13 +265,13 @@ fun AssistantMessageBubble(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            
+
             // Show spinner when waiting for first token (non-thinking mode)
-            val showLoadingSpinner = !isReasoningEnabled && 
-                message.content.isBlank() && 
-                responseStatus == ResponseStatus.STREAMING &&
-                !showThinkingIndicator
-            
+            val showLoadingSpinner = !isReasoningEnabled &&
+                    message.content.isBlank() &&
+                    responseStatus == ResponseStatus.STREAMING &&
+                    !showThinkingIndicator
+
             if (showLoadingSpinner) {
                 CircularProgressIndicator(
                     color = colors.textPrimary,
@@ -253,7 +279,7 @@ fun AssistantMessageBubble(
                     modifier = Modifier.size(24.dp)
                 )
             }
-            
+
             // Actual content with streaming text (no cursor)
             AnimatedVisibility(
                 visible = !showThinkingIndicator && message.content.isNotBlank(),
@@ -338,7 +364,7 @@ fun AssistantMessageBubble(
                     )
                 )
             }
-            
+
             // Action toolbar - only show when complete
             if (responseStatus == ResponseStatus.COMPLETE && message.content.isNotBlank()) {
                 MessageActionToolbar(
@@ -367,7 +393,8 @@ private fun MessageActionToolbar(
         // Copy button
         IconButton(
             onClick = {
-                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clipboardManager =
+                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = ClipData.newPlainText("AI Response", messageContent)
                 clipboardManager.setPrimaryClip(clip)
             },
@@ -380,9 +407,9 @@ private fun MessageActionToolbar(
                 modifier = Modifier.size(20.dp)
             )
         }
-        
+
         Spacer(modifier = Modifier.width(6.dp))
-        
+
         // Share button
         IconButton(
             onClick = {
