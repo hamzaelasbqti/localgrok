@@ -273,43 +273,6 @@ class ChatViewModel(
     }
 
     /**
-     * Show an assistant-style reminder when no server is configured
-     */
-    fun sendSetupReminder() {
-        if (_uiState.value.isGenerating) return
-
-        viewModelScope.launch {
-            val reminder = "Set up server in settings to start chatting."
-            var chatId = _currentChat.value?.id
-
-            if (chatId == null) {
-                chatId = chatRepository.createChat(
-                    title = "Setup required",
-                    model = currentModel
-                )
-                selectChat(chatId)
-                kotlinx.coroutines.delay(50)
-            }
-
-            val assistantMessageId = chatRepository.createAssistantMessage(chatId!!)
-            chatRepository.updateMessageState(
-                messageId = assistantMessageId,
-                content = reminder,
-                isStreaming = false,
-                isThinking = false
-            )
-
-            _streamingState.value = null
-            _uiState.value = _uiState.value.copy(isGenerating = false, error = null)
-        }
-    }
-
-    companion object {
-        // Only allow a single tool call per prompt - small models struggle with multi-tool calling
-        private const val MAX_TOOL_CALLS = 1
-    }
-
-    /**
      * Internal function to handle streaming with tool call support
      * Can be called recursively when a tool call is executed
      */
@@ -320,12 +283,8 @@ class ChatViewModel(
         systemPrompt: String?,
         thinkEnabled: Boolean,
         toolResultContext: String? = null,  // Tool result to inject if continuing after tool call
-        toolCallCount: Int = 0,  // Track how many tools have been called
-        toolUsed: Boolean = false,  // Track if a tool was used for this message
-        toolUsedDisplayName: String? = null  // Human readable tool label if used
+        toolCallCount: Int = 0  // Track how many tools have been called
     ) {
-        var hasUsedTool = toolUsed || toolResultContext != null
-        var currentToolDisplayName = toolUsedDisplayName
 
         // Get messages for API context
         var messagesForApi = chatRepository.getMessagesForChat(chatId).first()
@@ -335,7 +294,18 @@ class ChatViewModel(
         // Build effective system prompt with tool results
         val effectiveSystemPrompt = if (toolResultContext != null) {
             val basePrompt = systemPrompt ?: ""
-            "$basePrompt\n\n<tool_result>\n$toolResultContext\n</tool_result>\n\nUse the above results to respond naturally. Do NOT call any more tools."
+            """$basePrompt
+
+<tool_result>
+$toolResultContext
+</tool_result>
+
+CRITICAL INSTRUCTIONS:
+- Use the tool results above to answer the user's question in natural, conversational language
+- DO NOT echo or repeat the <tool_result> tags - they are for your reference only
+- DO NOT list raw search results - summarize and synthesize the information
+- Provide a clear, direct answer based on the tool results
+- DO NOT call any more tools"""
         } else {
             systemPrompt
         }
@@ -378,10 +348,11 @@ class ChatViewModel(
 
                 // EARLY DETECTION: Check if response is starting with tool call pattern
                 // This happens before we have the complete tool call
-                if (!toolCallEarlyDetected && !toolCallDetected && chatRepository.isStartingWithToolCall(
-                        contentResponse
-                    )
-                ) {
+                // Only trigger on <tool_call>, not <tool_result> (which is normal content)
+                val startsWithToolCall = chatRepository.isStartingWithToolCall(contentResponse)
+                val startsWithToolResult = contentResponse.trimStart().startsWith("<tool_result>", ignoreCase = true)
+                
+                if (!toolCallEarlyDetected && !toolCallDetected && startsWithToolCall && !startsWithToolResult) {
                     toolCallEarlyDetected = true
 
                     // Immediately show tool execution indicator - hide all content
@@ -393,17 +364,34 @@ class ChatViewModel(
                             isStreaming = true,
                             isExecutingTool = true,
                             toolDisplayName = null,  // Tool not known yet
-                            toolUsed = hasUsedTool
+                            toolUsed = false  // Tool not used yet during early detection
                         )
                     }
                 }
 
+                // Reset early detection if we determine it's actually a tool_result (not a tool_call)
+                if (toolCallEarlyDetected && contentResponse.trimStart().startsWith("<tool_result>", ignoreCase = true)) {
+                    toolCallEarlyDetected = false  // Reset - this is normal content, not a tool call
+                    // Update UI to show normal content instead of "Working"
+                    val cleanedContent = chatRepository.cleanToolArtifacts(contentResponse)
+                    withContext(Dispatchers.Main.immediate) {
+                        _streamingState.value = StreamingMessageState(
+                            messageId = assistantMessageId,
+                            content = cleanedContent,
+                            isThinking = false,
+                            isStreaming = true,
+                            isExecutingTool = false,
+                            toolDisplayName = null,
+                            toolUsed = false
+                        )
+                    }
+                }
+                
                 // Check for complete tool call in accumulated response
                 val toolCall = chatRepository.detectToolCall(contentResponse)
                 if (toolCall != null && !toolCallDetected) {
                     toolCallDetected = true
                     detectedToolCall = toolCall
-                    currentToolDisplayName = toolCall.displayName
 
                     // Update with the tool display name now that we know it
                     withContext(Dispatchers.Main.immediate) {
@@ -414,7 +402,7 @@ class ChatViewModel(
                             isStreaming = true,
                             isExecutingTool = true,
                             toolDisplayName = toolCall.displayName,
-                            toolUsed = true
+                            toolUsed = true  // Tool is being used
                         )
                     }
 
@@ -434,8 +422,8 @@ class ChatViewModel(
                             content = cleanedContent,
                             isThinking = false,
                             isStreaming = true,
-                            toolUsed = hasUsedTool,
-                            toolDisplayName = currentToolDisplayName
+                            toolUsed = false,  // No tool used yet
+                            toolDisplayName = null  // No tool display name
                         )
                     }
 
@@ -445,100 +433,152 @@ class ChatViewModel(
                         content = cleanedContent,
                         isStreaming = true,
                         isThinking = false,
-                        toolUsed = hasUsedTool,
-                        toolDisplayName = currentToolDisplayName ?: ""
+                        toolUsed = false,
+                        toolDisplayName = ""
                     )
                 }
             },
             onComplete = {
-                // Continue in the same coroutine so stopGeneration can cancel all steps
-                if (toolCallDetected && detectedToolCall != null) {
-                    // Execute the tool
-                    val toolResult = chatRepository.executeTool(detectedToolCall!!)
+                viewModelScope.launch {
+                        // Check if we detected a tool call during streaming
+                    if (toolCallDetected && detectedToolCall != null) {
+                        // Execute the tool
+                        val toolResult = chatRepository.executeTool(detectedToolCall!!)
 
-                    // Get content before tool call (should be empty for tool-first responses)
-                    val contentBeforeToolCall =
-                        chatRepository.getContentBeforeToolCall(contentResponse)
+                        // Get content before tool call (should be empty for tool-first responses)
+                        val contentBeforeToolCall = chatRepository.getContentBeforeToolCall(contentResponse)
 
-                    // Update the message with content so far
-                    chatRepository.updateMessageState(
-                        messageId = assistantMessageId,
-                        content = contentBeforeToolCall,
-                        isStreaming = true,
-                        isThinking = false,
-                        toolUsed = true,
-                        toolDisplayName = currentToolDisplayName ?: detectedToolCall?.displayName
-                        ?: ""
-                    )
-                    hasUsedTool = true
-                    currentToolDisplayName = currentToolDisplayName ?: detectedToolCall?.displayName
+                        // Update the message with content before tool call (usually empty)
+                        // The natural response will be generated by the recursive call below
+                        chatRepository.updateMessageState(
+                            messageId = assistantMessageId,
+                            content = contentBeforeToolCall,
+                            isStreaming = true,
+                            isThinking = false,
+                            toolUsed = true,  // Mark tool as used
+                            toolDisplayName = detectedToolCall.displayName  // Set display name
+                        )
 
-                    // Continue the conversation with tool results without spawning a new job
-                    streamWithToolSupport(
-                        chatId = chatId,
-                        assistantMessageId = assistantMessageId,
-                        model = model,
-                        systemPrompt = systemPrompt,
-                        thinkEnabled = thinkEnabled,
-                        toolResultContext = toolResult,
-                        toolCallCount = toolCallCount + 1,
-                        toolUsed = true,
-                        toolUsedDisplayName = currentToolDisplayName
-                    )
-                    return@streamChatWithCallback
+                        // Continue the conversation with tool results
+                        streamWithToolSupport(
+                            chatId = chatId,
+                            assistantMessageId = assistantMessageId,
+                            model = model,
+                            systemPrompt = systemPrompt,
+                            thinkEnabled = thinkEnabled,
+                            toolResultContext = toolResult,
+                            toolCallCount = toolCallCount + 1
+                        )
+                    } else {
+                        // No tool call - normal completion
+                        // BUT: If we have toolResultContext, a tool was used earlier, so preserve that
+                        val wasToolUsed = toolResultContext != null
+                        val toolDisplayNameToUse = if (wasToolUsed && toolResultContext != null) {
+                            // Detect which tool was used from the tool result content
+                            when {
+                                toolResultContext.contains("Search Results:", ignoreCase = true) ||
+                                toolResultContext.contains("Search", ignoreCase = true) -> "Searched the web"
+                                toolResultContext.contains("Current date and time:", ignoreCase = true) ||
+                                toolResultContext.contains("time", ignoreCase = true) -> "Checked time"
+                                else -> "Completed"
+                            }
+                        } else null
+                        
+                        val cleanedContent = chatRepository.cleanToolArtifacts(contentResponse)
+                        
+                        // Check if this is actually a tool_result echo (model echoing back tool results)
+                        // vs an actual tool_call that failed to parse
+                        val containsToolResult = contentResponse.contains("<tool_result>", ignoreCase = true)
+                        val containsToolCall = contentResponse.contains("<tool_call>", ignoreCase = true)
+                        
+                        // DEBUG: If we detected early tool call pattern but couldn't parse it, show full details
+                        val finalContent = when {
+                            cleanedContent.isNotBlank() -> cleanedContent
+                            // If it's a tool_result echo, clean it - if no other content, show empty
+                            // The strengthened prompt should prevent this, but if it happens, just show cleaned content
+                            containsToolResult && !containsToolCall -> cleanedContent
+                            // If we detected a tool_call but couldn't parse it, show debug info
+                            toolCallEarlyDetected && containsToolCall -> {
+                                buildString {
+                                    append("⚠️ TOOL CALL DETECTION FAILED - DEBUG INFO:\n\n")
+                                    append("=== RAW RESPONSE ===\n")
+                                    append(contentResponse)
+                                    append("\n\n=== DETECTION STATE ===\n")
+                                    append("Early Detection: $toolCallEarlyDetected\n")
+                                    append("Tool Call Detected: $toolCallDetected\n")
+                                    append("Detected Tool Call: $detectedToolCall\n")
+                                    append("Contains <tool_result>: $containsToolResult\n")
+                                    append("Contains <tool_call>: $containsToolCall\n")
+                                    
+                                    // Try to detect again and show what happens
+                                    val attemptedDetection = chatRepository.detectToolCall(contentResponse)
+                                    append("Re-attempt Detection Result: $attemptedDetection\n")
+                                    
+                                    // Check if it starts with tool call
+                                    val startsWithToolCall = chatRepository.isStartingWithToolCall(contentResponse)
+                                    append("Starts with tool call: $startsWithToolCall\n")
+                                    
+                                    // Show content before tool call
+                                    val contentBefore = chatRepository.getContentBeforeToolCall(contentResponse)
+                                    append("\n=== CONTENT BEFORE TOOL CALL ===\n")
+                                    append(if (contentBefore.isBlank()) "(empty)" else contentBefore)
+                                    append("\n\n=== REASONING CONTENT ===\n")
+                                    append(if (reasoningResponse.isBlank()) "(empty)" else reasoningResponse)
+                                }
+                            }
+                            // Other cases - just show cleaned content or debug
+                            toolCallEarlyDetected -> {
+                                buildString {
+                                    append("⚠️ Early detection triggered but no tool call found:\n\n")
+                                    append("=== RAW RESPONSE ===\n")
+                                    append(contentResponse)
+                                    append("\n\n=== CLEANED ===\n")
+                                    append(cleanedContent.ifBlank { "(empty)" })
+                                }
+                            }
+                            else -> cleanedContent
+                        }
+
+                        // Final update to streaming state - PRESERVE UI STATE
+                        _streamingState.value = StreamingMessageState(
+                            messageId = assistantMessageId,
+                            content = finalContent,
+                            isThinking = false,
+                            isStreaming = false,
+                            toolUsed = wasToolUsed,  // Preserve tool usage from earlier execution
+                            toolDisplayName = toolDisplayNameToUse  // Preserve tool display name
+                        )
+
+                        // Persist final state to database
+                        chatRepository.updateMessageStateWithReasoning(
+                            messageId = assistantMessageId,
+                            content = finalContent,
+                            isStreaming = false,
+                            isThinking = false,
+                            reasoningContent = reasoningResponse,
+                            toolUsed = wasToolUsed,  // Preserve tool usage
+                            toolDisplayName = toolDisplayNameToUse ?: ""  // Preserve tool display name
+                        )
+
+                        _uiState.value = _uiState.value.copy(isGenerating = false)
+
+                        // Clear streaming state after a brief delay
+                        kotlinx.coroutines.delay(100)
+                        _streamingState.value = null
+                    }
                 }
-
-                // No tool call - normal completion
-                // Clean any tool artifacts from the response before displaying
-                val cleanedContent = chatRepository.cleanToolArtifacts(contentResponse)
-                // If we thought it was a tool call but couldn't parse/execute, avoid showing nothing
-                val finalContent = if (cleanedContent.isNotBlank()) {
-                    cleanedContent
-                } else if (toolCallEarlyDetected) {
-                    "I couldn't run that tool. Please try again without it."
-                } else {
-                    cleanedContent
-                }
-
-                // Final update to streaming state
-                withContext(Dispatchers.Main.immediate) {
-                    _streamingState.value = StreamingMessageState(
-                        messageId = assistantMessageId,
-                        content = finalContent,
-                        isThinking = false,
-                        isStreaming = false,
-                        toolUsed = hasUsedTool,
-                        toolDisplayName = currentToolDisplayName
-                    )
-                }
-
-                // Persist final state to database (including reasoning content)
-                chatRepository.updateMessageStateWithReasoning(
-                    messageId = assistantMessageId,
-                    content = finalContent,
-                    isStreaming = false,
-                    isThinking = false,
-                    reasoningContent = reasoningResponse,
-                    toolUsed = hasUsedTool,
-                    toolDisplayName = currentToolDisplayName ?: ""
-                )
-
-                _uiState.value = _uiState.value.copy(isGenerating = false)
-
-                // Clear streaming state after a brief delay to allow UI to settle
-                kotlinx.coroutines.delay(100)
-                _streamingState.value = null
             },
             onError = { error ->
                 viewModelScope.launch {
+                    val currentToolState = _streamingState.value
                     _streamingState.value = null
                     chatRepository.updateMessageState(
                         messageId = assistantMessageId,
                         content = "Error: $error",
                         isStreaming = false,
                         isThinking = false,
-                        toolUsed = hasUsedTool,
-                        toolDisplayName = currentToolDisplayName ?: ""
+                        toolUsed = currentToolState?.toolUsed ?: false,
+                        toolDisplayName = currentToolState?.toolDisplayName ?: ""
                     )
                     _uiState.value = _uiState.value.copy(
                         isGenerating = false,
@@ -578,6 +618,7 @@ class ChatViewModel(
             _uiState.value = _uiState.value.copy(isGenerating = false)
         }
     }
+
 
     fun setModel(model: String) {
         currentModel = model

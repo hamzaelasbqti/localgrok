@@ -1,11 +1,11 @@
 package com.localgrok.ui.components
-
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,11 +17,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Lightbulb
@@ -37,17 +35,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.LocalContext
-import android.widget.Toast
 import com.localgrok.ui.theme.InterFont
 import com.localgrok.ui.theme.LocalAppColors
 import com.localgrok.ui.theme.LocalGrokColors
@@ -103,11 +98,11 @@ fun TwoLineMenuIcon(
 fun GrokTopBar(
     onMenuClick: () -> Unit,
     onNewConversationClick: () -> Unit,
+    onImagineUnavailable: () -> Unit = {},
     colors: LocalGrokColors = LocalAppColors.current,
     modifier: Modifier = Modifier
 ) {
     var isAskActive by remember { mutableStateOf(true) }
-    val context = LocalContext.current
 
     Row(
         modifier = modifier
@@ -135,8 +130,8 @@ fun GrokTopBar(
                     // Allow toggling to Ask
                     isAskActive = true
                 } else {
-                    // Prevent toggling to Imagine, show toast instead
-                    Toast.makeText(context, "Coming soon!", Toast.LENGTH_SHORT).show()
+                    // Prevent toggling to Imagine, surface unified snackbar message
+                    onImagineUnavailable()
                 }
             },
             leftIcon = Icons.Outlined.ChatBubbleOutline,

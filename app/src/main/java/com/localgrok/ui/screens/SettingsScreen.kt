@@ -85,14 +85,6 @@ fun SettingsScreen(
         viewModel.loadSettings()
     }
 
-    // Show snackbar when settings are saved
-    LaunchedEffect(uiState.isSaved) {
-        if (uiState.isSaved) {
-            snackbarHostState.showSnackbar("Settings saved")
-            viewModel.clearMessage()
-        }
-    }
-
     // State for unsaved changes dialog
     var showUnsavedDialog by remember { mutableStateOf(false) }
 
@@ -161,7 +153,18 @@ fun SettingsScreen(
             )
         },
         containerColor = colors.background,
-        snackbarHost = { },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                snackbar = { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        containerColor = colors.darkGrey,
+                        contentColor = colors.textPrimary
+                    )
+                }
+            )
+        },
         modifier = modifier
     ) { paddingValues ->
         Box(
@@ -175,135 +178,135 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-            // Section: Server Configuration
-            SectionHeader(title = "SERVER")
+                // Section: Server Configuration
+                SectionHeader(title = "SERVER")
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Server IP Input
-            GrokTextField(
-                label = "Server IP Address",
-                value = uiState.serverIp,
-                onValueChange = { viewModel.updateServerIp(it) },
-                placeholder = "127.0.0.1",
-                keyboardType = KeyboardType.Uri,
-                imeAction = ImeAction.Next,
-                onImeAction = { portFocusRequester.requestFocus() }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Server Port Input
-            GrokTextField(
-                label = "Ollama Port",
-                value = uiState.serverPort,
-                onValueChange = { viewModel.updateServerPort(it) },
-                placeholder = "11434",
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Next,
-                onImeAction = { /* Focus next field */ },
-                focusRequester = portFocusRequester
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // SearXNG Port Input (for web search)
-            GrokTextField(
-                label = "SearXNG Port (Web Search)",
-                value = uiState.searxngPort,
-                onValueChange = { viewModel.updateSearxngPort(it) },
-                placeholder = "8080",
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Done,
-                onImeAction = { focusManager.clearFocus() }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "SearXNG provides web search capabilities. Uses same server IP as Ollama.",
-                fontFamily = InterFont,
-                fontSize = 12.sp,
-                color = colors.textSubtle
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Section: Appearance
-            SectionHeader(title = "APPEARANCE")
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Theme",
-                fontFamily = InterFont,
-                fontSize = 13.sp,
-                color = colors.textSecondary
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Theme Toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ThemeOptionButton(
-                    label = "Dark",
-                    isSelected = appTheme == AppTheme.DARK,
-                    onClick = { viewModel.setAppTheme(AppTheme.DARK) },
-                    colors = colors,
-                    modifier = Modifier.weight(1f)
+                // Server IP Input
+                GrokTextField(
+                    label = "Server IP Address",
+                    value = uiState.serverIp,
+                    onValueChange = { viewModel.updateServerIp(it) },
+                    placeholder = "127.0.0.1",
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Next,
+                    onImeAction = { portFocusRequester.requestFocus() }
                 )
-                ThemeOptionButton(
-                    label = "Space",
-                    isSelected = appTheme == AppTheme.SPACE,
-                    onClick = { viewModel.setAppTheme(AppTheme.SPACE) },
-                    colors = colors,
-                    modifier = Modifier.weight(1f)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Server Port Input
+                GrokTextField(
+                    label = "Ollama Port",
+                    value = uiState.serverPort,
+                    onValueChange = { viewModel.updateServerPort(it) },
+                    placeholder = "11434",
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Next,
+                    onImeAction = { /* Focus next field */ },
+                    focusRequester = portFocusRequester
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SearXNG Port Input (for web search)
+                GrokTextField(
+                    label = "SearXNG Port (Web Search)",
+                    value = uiState.searxngPort,
+                    onValueChange = { viewModel.updateSearxngPort(it) },
+                    placeholder = "8080",
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done,
+                    onImeAction = { focusManager.clearFocus() }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "SearXNG provides web search capabilities. Uses same server IP as Ollama.",
+                    fontFamily = InterFont,
+                    fontSize = 12.sp,
+                    color = colors.textSubtle
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Section: Appearance
+                SectionHeader(title = "APPEARANCE")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Theme",
+                    fontFamily = InterFont,
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Theme Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ThemeOptionButton(
+                        label = "Dark",
+                        isSelected = appTheme == AppTheme.DARK,
+                        onClick = { viewModel.setAppTheme(AppTheme.DARK) },
+                        colors = colors,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ThemeOptionButton(
+                        label = "Space",
+                        isSelected = appTheme == AppTheme.SPACE,
+                        onClick = { viewModel.setAppTheme(AppTheme.SPACE) },
+                        colors = colors,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Section: About
+                SectionHeader(title = "ABOUT")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "localgrok",
+                    fontFamily = InterFont,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 15.sp,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Privacy-focused AI client for local LLM servers",
+                    fontFamily = InterFont,
+                    fontSize = 14.sp,
+                    color = colors.textSecondary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Your conversations never leave your local network.",
+                    fontFamily = InterFont,
+                    fontSize = 13.sp,
+                    color = colors.textSubtle
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Made with ❤️ by Scrumble",
+                    fontFamily = InterFont,
+                    fontSize = 13.sp,
+                    color = colors.textSubtle
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Section: About
-            SectionHeader(title = "ABOUT")
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "localgrok",
-                fontFamily = InterFont,
-                fontWeight = FontWeight.Medium,
-                fontSize = 15.sp,
-                color = colors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Privacy-focused AI client for local LLM servers",
-                fontFamily = InterFont,
-                fontSize = 14.sp,
-                color = colors.textSecondary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Your conversations never leave your local network.",
-                fontFamily = InterFont,
-                fontSize = 13.sp,
-                color = colors.textSubtle
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Made with ❤️ by Scrumble",
-                fontFamily = InterFont,
-                fontSize = 13.sp,
-                color = colors.textSubtle
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-        }
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier
@@ -317,58 +320,59 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(8.dp)
                 )
             }
-    }
+        }
 
-    // Unsaved changes dialog
-    if (showUnsavedDialog) {
-        AlertDialog(
-            onDismissRequest = { showUnsavedDialog = false },
-            containerColor = colors.darkGrey,
-            title = {
-                Text(
-                    text = "Unsaved Changes",
-                    fontFamily = InterFont,
-                    fontWeight = FontWeight.Medium,
-                    color = colors.textPrimary
-                )
-            },
-            text = {
-                Text(
-                    text = "You have unsaved changes. Do you want to discard them?",
-                    fontFamily = InterFont,
-                    color = colors.textSecondary
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (!isBackNavigating) {
-                            isBackNavigating = true
-                            viewModel.loadSettings()
-                            showUnsavedDialog = false
-                            onNavigateBack()
-                        }
-                    }
-                ) {
+        // Unsaved changes dialog
+        if (showUnsavedDialog) {
+            AlertDialog(
+                onDismissRequest = { showUnsavedDialog = false },
+                containerColor = colors.darkGrey,
+                title = {
                     Text(
-                        text = "Discard",
+                        text = "Unsaved Changes",
                         fontFamily = InterFont,
-                        color = colors.error
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showUnsavedDialog = false }
-                ) {
-                    Text(
-                        text = "Keep Editing",
-                        fontFamily = InterFont,
+                        fontWeight = FontWeight.Medium,
                         color = colors.textPrimary
                     )
+                },
+                text = {
+                    Text(
+                        text = "You have unsaved changes. Do you want to discard them?",
+                        fontFamily = InterFont,
+                        color = colors.textSecondary
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (!isBackNavigating) {
+                                isBackNavigating = true
+                                viewModel.loadSettings()
+                                showUnsavedDialog = false
+                                onNavigateBack()
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = "Discard",
+                            fontFamily = InterFont,
+                            color = colors.error
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showUnsavedDialog = false }
+                    ) {
+                        Text(
+                            text = "Keep Editing",
+                            fontFamily = InterFont,
+                            color = colors.textPrimary
+                        )
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 

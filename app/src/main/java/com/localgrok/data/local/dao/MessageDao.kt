@@ -37,10 +37,25 @@ interface MessageDao {
     suspend fun updateMessageContent(messageId: Long, content: String, isStreaming: Boolean = false)
 
     @Query("UPDATE messages SET content = :content, isStreaming = :isStreaming, isThinking = :isThinking, toolUsed = :toolUsed, toolDisplayName = :toolDisplayName WHERE id = :messageId")
-    suspend fun updateMessageState(messageId: Long, content: String, isStreaming: Boolean, isThinking: Boolean, toolUsed: Boolean, toolDisplayName: String)
+    suspend fun updateMessageState(
+        messageId: Long,
+        content: String,
+        isStreaming: Boolean,
+        isThinking: Boolean,
+        toolUsed: Boolean,
+        toolDisplayName: String
+    )
 
     @Query("UPDATE messages SET content = :content, isStreaming = :isStreaming, isThinking = :isThinking, reasoningContent = :reasoningContent, toolUsed = :toolUsed, toolDisplayName = :toolDisplayName WHERE id = :messageId")
-    suspend fun updateMessageStateWithReasoning(messageId: Long, content: String, isStreaming: Boolean, isThinking: Boolean, reasoningContent: String, toolUsed: Boolean, toolDisplayName: String)
+    suspend fun updateMessageStateWithReasoning(
+        messageId: Long,
+        content: String,
+        isStreaming: Boolean,
+        isThinking: Boolean,
+        reasoningContent: String,
+        toolUsed: Boolean,
+        toolDisplayName: String
+    )
 
     @Query("UPDATE messages SET reasoningContent = :reasoningContent WHERE id = :messageId")
     suspend fun updateReasoningContent(messageId: Long, reasoningContent: String)

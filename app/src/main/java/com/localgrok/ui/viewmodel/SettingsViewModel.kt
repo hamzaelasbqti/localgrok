@@ -124,9 +124,7 @@ class SettingsViewModel(
             chatRepository.configureSearxng(serverIp, searxngPort)
 
             _uiState.value = _uiState.value.copy(
-                isSaved = true,
-                isDirty = false,
-                message = "Settings saved"
+                isDirty = false
             )
         }
     }
@@ -135,12 +133,6 @@ class SettingsViewModel(
         return _uiState.value.isDirty
     }
 
-    fun clearMessage() {
-        _uiState.value = _uiState.value.copy(
-            message = null,
-            isSaved = false
-        )
-    }
 }
 
 /**
@@ -150,7 +142,5 @@ data class SettingsUiState(
     val serverIp: String = "127.0.0.1",
     val serverPort: String = "11434",
     val searxngPort: String = "8080",
-    val isDirty: Boolean = false,
-    val message: String? = null,
-    val isSaved: Boolean = false
+    val isDirty: Boolean = false
 )

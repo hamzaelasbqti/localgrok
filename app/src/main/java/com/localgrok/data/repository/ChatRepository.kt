@@ -19,8 +19,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.coroutineContext
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -453,8 +451,8 @@ class ChatRepository(
     fun isStartingWithToolCall(response: String): Boolean {
         val trimmed = response.trimStart()
         return trimmed.startsWith(TOOL_CALL_PREFIX) ||
-               // Also check partial matches as tokens come in
-               TOOL_CALL_PREFIX.startsWith(trimmed) && trimmed.isNotEmpty() && trimmed.length < TOOL_CALL_PREFIX.length
+                // Also check partial matches as tokens come in
+                TOOL_CALL_PREFIX.startsWith(trimmed) && trimmed.isNotEmpty() && trimmed.length < TOOL_CALL_PREFIX.length
     }
 
     /**
@@ -474,46 +472,72 @@ class ChatRepository(
 
     /**
      * Extract and parse the tool call payload from the response.
-     * This is more tolerant than the previous regex-only approach and
-     * handles nested braces / streaming partials more reliably.
+     * Uses balanced brace counting to handle JSON properly (including } inside string values).
      */
     private fun findToolCallPayload(response: String): ToolCallPayload? {
         // Locate the tool_call tag
         val startIndex = response.indexOf(TOOL_CALL_PREFIX)
         if (startIndex == -1) return null
         val afterTagIndex = startIndex + TOOL_CALL_PREFIX.length
-
+        
         // Grab everything after <tool_call>, optionally stopping at </tool_call>
         val trailing = response.substring(afterTagIndex)
         val endIndex = trailing.indexOf("</tool_call>")
         val inner = if (endIndex != -1) trailing.substring(0, endIndex) else trailing
-
+        
         // Find the first balanced JSON object within the inner string
         val jsonStart = inner.indexOf('{')
         if (jsonStart == -1) return null
-
+        
         var depth = 0
         var jsonEnd = -1
+        var inString = false
+        var escapeNext = false
+        
         for (i in jsonStart until inner.length) {
-            when (inner[i]) {
-                '{' -> depth++
+            val char = inner[i]
+            
+            if (escapeNext) {
+                escapeNext = false
+                continue
+            }
+            
+            when (char) {
+                '\\' -> {
+                    escapeNext = true
+                }
+                '"' -> {
+                    inString = !inString
+                }
+                '{' -> {
+                    if (!inString) depth++
+                }
                 '}' -> {
-                    depth--
-                    if (depth == 0) {
-                        jsonEnd = i
-                        break
+                    if (!inString) {
+                        depth--
+                        if (depth == 0) {
+                            jsonEnd = i
+                            break
+                        }
                     }
                 }
             }
         }
-
+        
         val jsonString = if (jsonEnd != -1) {
             inner.substring(jsonStart, jsonEnd + 1)
         } else {
             // Fallback: take the rest of the string if no closing brace yet (streaming)
             inner.substring(jsonStart)
         }
-
+        
+        return parseJsonPayload(jsonString)
+    }
+    
+    /**
+     * Parse JSON payload string into ToolCallPayload
+     */
+    private fun parseJsonPayload(jsonString: String): ToolCallPayload? {
         return runCatching {
             val element: JsonElement = json.decodeFromString(jsonString)
             val obj = element.jsonObject
@@ -563,7 +587,8 @@ class ChatRepository(
      * Execute a web search using SearXNG
      */
     private suspend fun executeWebSearch(query: String): String = withContext(Dispatchers.IO) {
-        val service = searxngService ?: return@withContext "Search not configured. Please set SearXNG port in settings."
+        val service = searxngService
+            ?: return@withContext "Search not configured. Please set SearXNG port in settings."
 
         try {
             val response = service.search(query)
@@ -587,7 +612,8 @@ class ChatRepository(
      */
     private fun getCurrentDateTime(): String {
         val now = java.time.LocalDateTime.now()
-        val formatter = java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy 'at' h:mm a")
+        val formatter =
+            java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy 'at' h:mm a")
         return "Current date and time: ${now.format(formatter)}"
     }
 }

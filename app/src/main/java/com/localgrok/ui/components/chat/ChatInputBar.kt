@@ -93,7 +93,6 @@ fun UnifiedInputBar(
     onBrainToggleChanged: () -> Unit = {},
     isGenerating: Boolean = false,
     enabled: Boolean = true,
-    allowEmptySend: Boolean = false,
     colors: LocalGrokColors = LocalAppColors.current,
     modifier: Modifier = Modifier
 ) {
@@ -149,7 +148,7 @@ fun UnifiedInputBar(
                 ),
                 keyboardActions = KeyboardActions(
                     onSend = {
-                        if ((value.isNotBlank() || allowEmptySend) && enabled) {
+                        if (value.isNotBlank() && enabled) {
                             onSend()
                         }
                     }
@@ -284,15 +283,15 @@ fun UnifiedInputBar(
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(
-                                if ((value.isNotBlank() || allowEmptySend) && enabled) colors.textPrimary else colors.mediumGrey
+                                if (value.isNotBlank() && enabled) colors.textPrimary else colors.mediumGrey
                             )
-                            .clickable(enabled = (value.isNotBlank() || allowEmptySend) && enabled) { onSend() },
+                            .clickable(enabled = value.isNotBlank() && enabled) { onSend() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
-                            tint = if ((value.isNotBlank() || allowEmptySend) && enabled) colors.background else colors.textDim,
+                            tint = if (value.isNotBlank() && enabled) colors.background else colors.textDim,
                             modifier = Modifier.size(18.dp)
                         )
                     }

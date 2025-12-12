@@ -14,7 +14,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,14 +30,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.localgrok.ui.theme.InterFont
-import com.localgrok.ui.theme.LocalGrokColors
 import com.localgrok.ui.theme.LocalAppColors
+import com.localgrok.ui.theme.LocalGrokColors
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
@@ -49,9 +48,9 @@ import com.mikepenz.markdown.m3.markdownTypography
  */
 private fun containsToolArtifacts(content: String): Boolean {
     return content.contains("<tool_result>", ignoreCase = true) ||
-           content.contains("</tool_result>", ignoreCase = true) ||
-           content.contains("<tool_call>", ignoreCase = true) ||
-           content.contains("</tool_call>", ignoreCase = true)
+            content.contains("</tool_result>", ignoreCase = true) ||
+            content.contains("<tool_call>", ignoreCase = true) ||
+            content.contains("</tool_call>", ignoreCase = true)
 }
 
 /**

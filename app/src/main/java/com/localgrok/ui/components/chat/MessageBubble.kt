@@ -172,20 +172,20 @@ fun AssistantMessageBubble(
             val persistedToolUsed = message.toolUsed
             val persistedToolDisplayName = message.toolDisplayName.takeIf { it.isNotBlank() }
 
-            // Detect if a tool was used by checking message content for tool result patterns
-            // This includes <tool_result> tags and other tool indicators
+            // Detect if a tool was used based on explicit execution flags or message content.
+            // We intentionally ignore reasoning content here because models may "think aloud"
+            // about possible tool calls without actually executing them, which would otherwise
+            // create false positives for the tool status indicator.
             val toolWasUsed = remember(
                 message.content,
                 toolDisplayName,
-                reasoningContent,
                 persistedToolUsed,
                 persistedToolDisplayName
             ) {
                 toolDisplayName != null ||
                         persistedToolUsed ||
                         persistedToolDisplayName != null ||
-                        containsToolArtifacts(message.content) ||
-                        containsToolArtifacts(reasoningContent)
+                        containsToolArtifacts(message.content)
             }
 
             // Determine which tool was used from content or displayName

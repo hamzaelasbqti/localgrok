@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
@@ -107,6 +111,9 @@ fun ChatScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val setupReminderText = "Set up server in settings to start chatting."
+    val imagineUnavailableText = "Image generation coming soon!"
 
     // State for delete confirmation dialog
     var chatToDelete by remember { mutableStateOf<ChatEntity?>(null) }
@@ -222,6 +229,14 @@ fun ChatScreen(
                         }
                     }
                 },
+                onImagineUnavailable = {
+                    // Only show another snackbar when the prior one has disappeared
+                    if (snackbarHostState.currentSnackbarData == null) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(imagineUnavailableText)
+                        }
+                    }
+                },
                 onNewConversationClick = {
                     // Only create new chat if current chat has messages
                     if (messages.isNotEmpty() && !isNavigating && !drawerState.isAnimationRunning) {
@@ -237,6 +252,8 @@ fun ChatScreen(
             val inputBarHeight = 100.dp
             val imeBottomPadding = WindowInsets.ime.getBottom(density)
             val imePaddingDp = with(density) { imeBottomPadding.toDp() }
+            val navBarBottomPadding: Int = WindowInsets.navigationBars.getBottom(density)
+            val navBarPaddingDp = with(density) { navBarBottomPadding.toDp() }
 
             Box(
                 modifier = Modifier
@@ -329,14 +346,35 @@ fun ChatScreen(
                     }
                 }
 
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    snackbar = { data ->
+                        Snackbar(
+                            snackbarData = data,
+                            containerColor = colors.darkGrey,
+                            contentColor = colors.textPrimary
+                        )
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(
+                            start = 4.dp,
+                            end = 4.dp,
+                            bottom = inputBarHeight + imePaddingDp + navBarPaddingDp
+                        )
+                )
+
                 // Child 2: Floating Input Bar (aligned to bottom, with transparent outer container)
                 UnifiedInputBar(
                     value = inputText,
                     onValueChange = { inputText = it },
                     onSend = {
                         if (uiState.connectionStatus != ConnectionStatus.Connected) {
-                            viewModel.sendSetupReminder()
-                            inputText = ""
+                            if (snackbarHostState.currentSnackbarData == null) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(setupReminderText)
+                                }
+                            }
                         } else if (inputText.isNotBlank()) {
                             viewModel.sendMessage(
                                 content = inputText,
@@ -355,7 +393,6 @@ fun ChatScreen(
                     onBrainToggleChanged = { viewModel.toggleBrain() },
                     isGenerating = uiState.isGenerating,
                     enabled = !uiState.isGenerating,
-                    allowEmptySend = uiState.connectionStatus != ConnectionStatus.Connected,
                     colors = colors,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
