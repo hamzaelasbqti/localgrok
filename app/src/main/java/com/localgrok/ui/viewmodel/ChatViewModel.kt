@@ -49,11 +49,7 @@ class ChatViewModel(
     private val _reasoningContent = MutableStateFlow<Map<Long, String>>(emptyMap())
     val reasoningContent: StateFlow<Map<Long, String>> = _reasoningContent.asStateFlow()
 
-    // Brain toggle state (Lightbulb) - controls reasoning and tool-enabled system prompt
-    private val _brainToggleEnabled = MutableStateFlow(true)
-    val brainToggleEnabled: StateFlow<Boolean> = _brainToggleEnabled.asStateFlow()
-
-    private var currentModel: String = "qwen3:0.6b-fp16"
+    private var currentModel: String = "gemma3:1b-it-qat"
 
     // Jobs for cancelling previous flow collections
     private var chatCollectionJob: Job? = null
@@ -217,8 +213,8 @@ class ChatViewModel(
         if (_uiState.value.isGenerating) return
 
         val useModel = model ?: currentModel
-        val thinkEnabled = _brainToggleEnabled.value
-        val systemPrompt = SystemPromptBuilder.buildSystemPrompt(_brainToggleEnabled.value)
+        val thinkEnabled = useModel == "qwen3:1.7b"
+        val systemPrompt = SystemPromptBuilder.buildSystemPrompt(useModel)
 
         streamingJob = viewModelScope.launch {
             // Create chat if needed
@@ -283,7 +279,8 @@ class ChatViewModel(
         systemPrompt: String?,
         thinkEnabled: Boolean,
         toolResultContext: String? = null,  // Tool result to inject if continuing after tool call
-        toolCallCount: Int = 0  // Track how many tools have been called
+        toolCallCount: Int = 0,  // Track how many tools have been called
+        maxToolCalls: Int = 1  // Maximum number of tool calls allowed per message
     ) {
 
         // Get messages for API context
@@ -291,9 +288,17 @@ class ChatViewModel(
             .filter { it.id != assistantMessageId }
             .toMutableList()
 
+        // Check if we've reached the maximum tool call limit
+        val hasReachedLimit = toolCallCount >= maxToolCalls
+
         // Build effective system prompt with tool results
         val effectiveSystemPrompt = if (toolResultContext != null) {
             val basePrompt = systemPrompt ?: ""
+            val limitWarning = if (hasReachedLimit) {
+                "\n\n⚠️ MAXIMUM TOOL CALL LIMIT REACHED: You have already used $toolCallCount tool calls. You MUST answer the user's question NOW using the tool results provided. DO NOT attempt to call any more tools - they will be ignored."
+            } else {
+                ""
+            }
             """$basePrompt
 
 <tool_result>
@@ -305,7 +310,7 @@ CRITICAL INSTRUCTIONS:
 - DO NOT echo or repeat the <tool_result> tags - they are for your reference only
 - DO NOT list raw search results - summarize and synthesize the information
 - Provide a clear, direct answer based on the tool results
-- DO NOT call any more tools"""
+- DO NOT call any more tools - you have already used $toolCallCount tool call(s)${limitWarning}"""
         } else {
             systemPrompt
         }
@@ -326,23 +331,58 @@ CRITICAL INSTRUCTIONS:
                 // Accumulate reasoning content
                 reasoningResponse += token
 
-                // Update reasoning content map for this message
-                _reasoningContent.value =
-                    _reasoningContent.value + (assistantMessageId to reasoningResponse)
+                // Only update reasoning content map if this is NOT after tool execution
+                // Reasoning should only be shown for initial thinking, not after tool execution
+                if (toolResultContext == null) {
+                    // Update reasoning content map for this message
+                    _reasoningContent.value =
+                        _reasoningContent.value + (assistantMessageId to reasoningResponse)
+
+                    // Persist reasoning content to database in background
+                    chatRepository.updateReasoningContent(assistantMessageId, reasoningResponse)
+                }
 
                 // Update streaming state immediately - still in thinking phase
                 _streamingState.value = _streamingState.value?.copy(
                     isThinking = true,
                     isStreaming = true
                 )
-
-                // Persist reasoning content to database in background
-                chatRepository.updateReasoningContent(assistantMessageId, reasoningResponse)
             },
             onToken = { token ->
                 // First content token received - transition from thinking to streaming
                 if (!hasStartedContent) {
                     hasStartedContent = true
+
+                    // If we're in a recursive call after tool execution, mark tool as completed
+                    // and update display name to past tense (e.g., "Searched the web")
+                    if (toolResultContext != null && _streamingState.value?.isExecutingTool == true) {
+                        // Determine the completed tool display name based on tool result
+                        val completedToolDisplayName = when {
+                            toolResultContext.contains("Search Results:", ignoreCase = true) ||
+                                    toolResultContext.contains(
+                                        "Search",
+                                        ignoreCase = true
+                                    ) -> "Searched the web"
+
+                            toolResultContext.contains(
+                                "Current date and time:",
+                                ignoreCase = true
+                            ) ||
+                                    toolResultContext.contains(
+                                        "time",
+                                        ignoreCase = true
+                                    ) -> "Checked time"
+
+                            else -> "Completed"
+                        }
+
+                        _streamingState.value = _streamingState.value?.copy(
+                            isExecutingTool = false,  // Mark as completed so "Searched the web" shows
+                            toolDisplayName = completedToolDisplayName,
+                            toolUsed = true,
+                            isStreaming = true  // Ensure streaming flag is set
+                        )
+                    }
                 }
                 contentResponse += token
 
@@ -356,11 +396,12 @@ CRITICAL INSTRUCTIONS:
                 if (!toolCallEarlyDetected && !toolCallDetected && startsWithToolCall && !startsWithToolResult) {
                     toolCallEarlyDetected = true
 
-                    // Immediately show tool execution indicator - hide all content
+                    // Immediately show tool execution indicator - preserve existing content
                     withContext(Dispatchers.Main.immediate) {
+                        val currentContent = _streamingState.value?.content ?: ""
                         _streamingState.value = StreamingMessageState(
                             messageId = assistantMessageId,
-                            content = "",  // Hide content - will be tool call XML
+                            content = currentContent,  // Preserve content, don't clear it
                             isThinking = false,
                             isStreaming = true,
                             isExecutingTool = true,
@@ -394,24 +435,37 @@ CRITICAL INSTRUCTIONS:
                 // Check for complete tool call in accumulated response
                 val toolCall = chatRepository.detectToolCall(contentResponse)
                 if (toolCall != null && !toolCallDetected) {
-                    toolCallDetected = true
-                    detectedToolCall = toolCall
+                    // Check if we've reached the maximum tool call limit
+                    if (hasReachedLimit) {
+                        // Ignore the tool call and continue with normal response
+                        // The model should respond naturally instead
+                        toolCallDetected = false
+                        detectedToolCall = null
+                        // Reset early detection since we're ignoring this tool call
+                        toolCallEarlyDetected = false
+                        // Continue processing as normal content
+                    } else {
+                        toolCallDetected = true
+                        detectedToolCall = toolCall
 
-                    // Update with the tool display name now that we know it
-                    withContext(Dispatchers.Main.immediate) {
-                        _streamingState.value = StreamingMessageState(
-                            messageId = assistantMessageId,
-                            content = "",  // Still hide content
-                            isThinking = false,
-                            isStreaming = true,
-                            isExecutingTool = true,
-                            toolDisplayName = toolCall.displayName,
-                            toolUsed = true  // Tool is being used
-                        )
+                        // Update with the tool display name now that we know it
+                        // Preserve existing content, don't clear it
+                        withContext(Dispatchers.Main.immediate) {
+                            val currentContent = _streamingState.value?.content ?: ""
+                            _streamingState.value = StreamingMessageState(
+                                messageId = assistantMessageId,
+                                content = currentContent,  // Preserve content
+                                isThinking = false,
+                                isStreaming = true,
+                                isExecutingTool = true,
+                                toolDisplayName = toolCall.displayName,
+                                toolUsed = true  // Tool is being used
+                            )
+                        }
+
+                        // We'll handle tool execution in onComplete
+                        return@streamChatWithCallback
                     }
-
-                    // We'll handle tool execution in onComplete
-                    return@streamChatWithCallback
                 }
 
                 // Only update UI with content if NOT in tool call mode
@@ -419,17 +473,12 @@ CRITICAL INSTRUCTIONS:
                     // Clean any tool artifacts from streaming content before displaying
                     val cleanedContent = chatRepository.cleanToolArtifacts(contentResponse)
 
-                    // Update streaming state IMMEDIATELY on main thread
-                    withContext(Dispatchers.Main.immediate) {
-                        _streamingState.value = StreamingMessageState(
-                            messageId = assistantMessageId,
-                            content = cleanedContent,
-                            isThinking = false,
-                            isStreaming = true,
-                            toolUsed = false,  // No tool used yet
-                            toolDisplayName = null  // No tool display name
-                        )
-                    }
+                    // Update streaming state directly with each token (no animation batching)
+                    _streamingState.value = _streamingState.value?.copy(
+                        content = cleanedContent,
+                        isThinking = false,
+                        isStreaming = true
+                    )
 
                     // Update database in background (for persistence)
                     chatRepository.updateMessageState(
@@ -445,9 +494,18 @@ CRITICAL INSTRUCTIONS:
             onComplete = {
                 viewModelScope.launch {
                     // Check if we detected a tool call during streaming
-                    if (toolCallDetected && detectedToolCall != null) {
+                    // Also verify we haven't reached the limit (double-check)
+                    // Store in local variable to avoid smart cast issues in closure
+                    val toolCallToExecute =
+                        if (toolCallDetected && detectedToolCall != null && !hasReachedLimit) {
+                            detectedToolCall
+                        } else {
+                            null
+                        }
+
+                    if (toolCallToExecute != null) {
                         // Execute the tool
-                        val toolResult = chatRepository.executeTool(detectedToolCall!!)
+                        val toolResult = chatRepository.executeTool(toolCallToExecute)
 
                         // Get content before tool call (should be empty for tool-first responses)
                         val contentBeforeToolCall =
@@ -461,8 +519,20 @@ CRITICAL INSTRUCTIONS:
                             isStreaming = true,
                             isThinking = false,
                             toolUsed = true,  // Mark tool as used
-                            toolDisplayName = detectedToolCall.displayName  // Set display name
+                            toolDisplayName = toolCallToExecute.displayName  // Set display name
                         )
+
+                        // Keep isExecutingTool = true during recursive call so "Searching the web" stays visible
+                        // We'll reset it when content starts streaming in the recursive call
+                        _streamingState.value = _streamingState.value?.copy(
+                            isExecutingTool = true,
+                            toolDisplayName = toolCallToExecute.displayName,
+                            toolUsed = true
+                        )
+
+                        // Clear reasoning content when tool execution starts
+                        // Reasoning should only be shown for initial thinking, not after tool execution
+                        _reasoningContent.value = _reasoningContent.value - assistantMessageId
 
                         // Continue the conversation with tool results
                         streamWithToolSupport(
@@ -472,13 +542,21 @@ CRITICAL INSTRUCTIONS:
                             systemPrompt = systemPrompt,
                             thinkEnabled = thinkEnabled,
                             toolResultContext = toolResult,
-                            toolCallCount = toolCallCount + 1
+                            toolCallCount = toolCallCount + 1,
+                            maxToolCalls = maxToolCalls
                         )
                     } else {
+                        // No tool call OR limit reached - normal completion
+                        // If limit was reached and model tried to call a tool, show a note
+                        val limitReachedNote = if (hasReachedLimit && toolCallDetected) {
+                            "\n\n[Note: Maximum tool call limit reached. Answering based on previous search results.]"
+                        } else {
+                            ""
+                        }
                         // No tool call - normal completion
                         // BUT: If we have toolResultContext, a tool was used earlier, so preserve that
                         val wasToolUsed = toolResultContext != null
-                        val toolDisplayNameToUse = if (wasToolUsed && toolResultContext != null) {
+                        val toolDisplayNameToUse = if (wasToolUsed) {
                             // Detect which tool was used from the tool result content
                             when {
                                 toolResultContext.contains("Search Results:", ignoreCase = true) ||
@@ -511,10 +589,10 @@ CRITICAL INSTRUCTIONS:
 
                         // DEBUG: If we detected early tool call pattern but couldn't parse it, show full details
                         val finalContent = when {
-                            cleanedContent.isNotBlank() -> cleanedContent
+                            cleanedContent.isNotBlank() -> cleanedContent + limitReachedNote
                             // If it's a tool_result echo, clean it - if no other content, show empty
                             // The strengthened prompt should prevent this, but if it happens, just show cleaned content
-                            containsToolResult && !containsToolCall -> cleanedContent
+                            containsToolResult && !containsToolCall -> cleanedContent + limitReachedNote
                             // If we detected a tool_call but couldn't parse it, show debug info
                             toolCallEarlyDetected && containsToolCall -> {
                                 buildString {
@@ -527,6 +605,9 @@ CRITICAL INSTRUCTIONS:
                                     append("Detected Tool Call: $detectedToolCall\n")
                                     append("Contains <tool_result>: $containsToolResult\n")
                                     append("Contains <tool_call>: $containsToolCall\n")
+                                    if (hasReachedLimit) {
+                                        append("⚠️ MAXIMUM TOOL CALL LIMIT REACHED ($toolCallCount/$maxToolCalls)\n")
+                                    }
 
                                     // Try to detect again and show what happens
                                     val attemptedDetection =
@@ -545,6 +626,7 @@ CRITICAL INSTRUCTIONS:
                                     append(if (contentBefore.isBlank()) "(empty)" else contentBefore)
                                     append("\n\n=== REASONING CONTENT ===\n")
                                     append(if (reasoningResponse.isBlank()) "(empty)" else reasoningResponse)
+                                    append(limitReachedNote)
                                 }
                             }
                             // Other cases - just show cleaned content or debug
@@ -555,18 +637,21 @@ CRITICAL INSTRUCTIONS:
                                     append(contentResponse)
                                     append("\n\n=== CLEANED ===\n")
                                     append(cleanedContent.ifBlank { "(empty)" })
+                                    append(limitReachedNote)
                                 }
                             }
 
-                            else -> cleanedContent
+                            else -> cleanedContent + limitReachedNote
                         }
 
                         // Final update to streaming state - PRESERVE UI STATE
+                        // Set isExecutingTool = false when complete so completed tool indicator shows
                         _streamingState.value = StreamingMessageState(
                             messageId = assistantMessageId,
                             content = finalContent,
                             isThinking = false,
                             isStreaming = false,
+                            isExecutingTool = false,  // Clear executing flag when complete
                             toolUsed = wasToolUsed,  // Preserve tool usage from earlier execution
                             toolDisplayName = toolDisplayNameToUse  // Preserve tool display name
                         )
@@ -653,14 +738,6 @@ CRITICAL INSTRUCTIONS:
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
-    }
-
-    /**
-     * Toggle the brain toggle (Lightbulb) state
-     * Controls reasoning mode and tool-enabled system prompt
-     */
-    fun toggleBrain() {
-        _brainToggleEnabled.value = !_brainToggleEnabled.value
     }
 }
 

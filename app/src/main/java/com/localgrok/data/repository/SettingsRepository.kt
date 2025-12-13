@@ -27,7 +27,7 @@ class SettingsRepository(private val context: Context) {
 
         const val DEFAULT_PORT = 11434
         const val DEFAULT_SEARXNG_PORT = 8080
-        const val DEFAULT_MODEL = "qwen3:0.6b-fp16"
+        const val DEFAULT_MODEL = "gemma3:1b-it-qat"
     }
 
     /**

@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.DarkMode
-import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,18 +63,18 @@ data class ModelOption(
 
 val MODEL_OPTIONS = listOf(
     ModelOption(
-        id = "lite",
-        displayName = "Lite",
-        subtitle = "Quick responses",
+        id = "standard",
+        displayName = "Flash",
+        subtitle = "Instant chat",
         icon = Icons.Outlined.DarkMode,
-        modelId = "qwen3:0.6b-fp16"
+        modelId = "gemma3:1b-it-qat"
     ),
     ModelOption(
-        id = "pro",
-        displayName = "Pro",
-        subtitle = "Thinks hard",
+        id = "reasoning",
+        displayName = "Think",
+        subtitle = "Tools & deep thinking",
         icon = Icons.Default.RocketLaunch,
-        modelId = "qwen3:1.7b-fp16"
+        modelId = "qwen3:1.7b"
     )
 )
 
@@ -89,8 +88,6 @@ fun UnifiedInputBar(
     onStop: () -> Unit = {},
     selectedModel: ModelOption,
     onModelSelected: (ModelOption) -> Unit,
-    brainToggleEnabled: Boolean = false,
-    onBrainToggleChanged: () -> Unit = {},
     isGenerating: Boolean = false,
     enabled: Boolean = true,
     colors: LocalGrokColors = LocalAppColors.current,
@@ -104,12 +101,12 @@ fun UnifiedInputBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp)
-            .padding(top = 8.dp, bottom = 4.dp)
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 16.dp)
     ) {
         // Content with rounded corners, background, and border
         // Tapping anywhere in this capsule focuses the text field
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
@@ -125,9 +122,10 @@ fun UnifiedInputBar(
                 ) {
                     focusRequester.requestFocus()
                 }
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Row 1: Text input field - with minimum height for easy tapping
+            // Text input field - takes flexible space
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -154,10 +152,9 @@ fun UnifiedInputBar(
                     }
                 ),
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .defaultMinSize(minHeight = 24.dp) // Compact single-line height
-                    .focusRequester(focusRequester)
-                    .padding(bottom = 8.dp),
+                    .focusRequester(focusRequester),
                 decorationBox = { innerTextField ->
                     Box(
                         contentAlignment = Alignment.CenterStart
@@ -175,126 +172,97 @@ fun UnifiedInputBar(
                 }
             )
 
-            // Row 2: Brain toggle, Model pill, Send button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Lightbulb toggle - controls reasoning and tool-enabled system prompt
-                // White background when ON (with dark icon), transparent when OFF
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Model Selector Pill with Dropdown
+            val density = LocalDensity.current
+
+            Box {
+                Row(
+                    modifier = Modifier
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(colors.mediumGrey)
+                        .clickable { showModelDropdown = true }
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = selectedModel.icon,
+                        contentDescription = null,
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = selectedModel.displayName,
+                        fontFamily = InterFont,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                        color = colors.textPrimary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                // Floating Dropdown Menu - positioned above the pill
+                if (showModelDropdown) {
+                    ModelSelectorDropdown(
+                        onDismissRequest = { showModelDropdown = false },
+                        selectedModel = selectedModel,
+                        onModelSelected = { model ->
+                            onModelSelected(model)
+                            showModelDropdown = false
+                        },
+                        density = density,
+                        colors = colors
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Send/Stop Button
+            if (isGenerating) {
+                // Stop Button - shown while generating
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(if (brainToggleEnabled) Color.White else Color.Transparent)
-                        .clickable { onBrainToggleChanged() },
+                        .background(colors.error)
+                        .clickable { onStop() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Lightbulb,
-                        contentDescription = if (brainToggleEnabled) {
-                            "Disable reasoning and system prompt"
-                        } else {
-                            "Enable reasoning and system prompt"
-                        },
-                        tint = if (brainToggleEnabled) colors.background else colors.textSecondary,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = "Stop generation",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-
-                // Spacer to push model pill and send/stop button to the right
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Model Selector Pill with Dropdown
-                val density = LocalDensity.current
-
-                Box {
-                    Row(
-                        modifier = Modifier
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(colors.mediumGrey)
-                            .clickable { showModelDropdown = true }
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = selectedModel.icon,
-                            contentDescription = null,
-                            tint = colors.textPrimary,
-                            modifier = Modifier.size(16.dp)
+            } else {
+                // Send Button - shown when not generating
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (value.isNotBlank() && enabled) colors.textPrimary else colors.mediumGrey
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = selectedModel.displayName,
-                            fontFamily = InterFont,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp,
-                            color = colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    // Floating Dropdown Menu - positioned above the pill
-                    if (showModelDropdown) {
-                        ModelSelectorDropdown(
-                            onDismissRequest = { showModelDropdown = false },
-                            selectedModel = selectedModel,
-                            onModelSelected = { model ->
-                                onModelSelected(model)
-                                showModelDropdown = false
-                            },
-                            density = density,
-                            colors = colors
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Send/Stop Button
-                if (isGenerating) {
-                    // Stop Button - shown while generating
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(colors.error)
-                            .clickable { onStop() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Stop,
-                            contentDescription = "Stop generation",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                } else {
-                    // Send Button - shown when not generating
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (value.isNotBlank() && enabled) colors.textPrimary else colors.mediumGrey
-                            )
-                            .clickable(enabled = value.isNotBlank() && enabled) { onSend() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = if (value.isNotBlank() && enabled) colors.background else colors.textDim,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                        .clickable(enabled = value.isNotBlank() && enabled) { onSend() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = if (value.isNotBlank() && enabled) colors.background else colors.textDim,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }

@@ -101,7 +101,6 @@ fun ChatScreen(
     val currentChat by viewModel.currentChat.collectAsState()
     val streamingState by viewModel.streamingState.collectAsState()
     val reasoningContent by viewModel.reasoningContent.collectAsState()
-    val brainToggleEnabled by viewModel.brainToggleEnabled.collectAsState()
 
     // Theme-aware colors
     val colors = LocalAppColors.current
@@ -317,7 +316,7 @@ fun ChatScreen(
                                     AssistantMessageBubble(
                                         message = displayMessage,
                                         reasoningContent = reasoningContent[message.id] ?: "",
-                                        isReasoningEnabled = brainToggleEnabled,
+                                        isReasoningEnabled = selectedModel.modelId == "qwen3:1.7b",
                                         isExecutingTool = isExecutingTool,
                                         toolDisplayName = toolDisplayName,
                                         modifier = Modifier.padding(vertical = 6.dp)
@@ -389,8 +388,6 @@ fun ChatScreen(
                         selectedModel = model
                         viewModel.setModel(model.modelId)
                     },
-                    brainToggleEnabled = brainToggleEnabled,
-                    onBrainToggleChanged = { viewModel.toggleBrain() },
                     isGenerating = uiState.isGenerating,
                     enabled = !uiState.isGenerating,
                     colors = colors,

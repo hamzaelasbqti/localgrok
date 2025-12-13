@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -166,7 +167,7 @@ fun CollapsibleThinkingSection(
                         linkText = colors.accent,
                         inlineCodeText = colors.textSecondary,
                         inlineCodeBackground = colors.darkGrey,
-                        dividerColor = colors.borderGrey
+                        dividerColor = Color.Transparent
                     ),
                     typography = markdownTypography(
                         text = MaterialTheme.typography.bodyMedium.copy(

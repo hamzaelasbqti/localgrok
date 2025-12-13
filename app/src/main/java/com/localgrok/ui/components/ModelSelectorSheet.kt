@@ -37,18 +37,18 @@ import com.localgrok.ui.theme.LocalAppColors
 
 val MODEL_OPTIONS = listOf(
     ModelOption(
-        id = "lite",
-        displayName = "Lite",
-        subtitle = "Quick responses",
+        id = "standard",
+        displayName = "Flash",
+        subtitle = "Instant chat",
         icon = Icons.Outlined.DarkMode,
-        modelId = "qwen3:0.6b-fp16"
+        modelId = "gemma3:1b-it-qat"
     ),
     ModelOption(
-        id = "pro",
-        displayName = "Pro",
-        subtitle = "Thinks hard",
+        id = "reasoning",
+        displayName = "Think",
+        subtitle = "Tools & deep thinking",
         icon = Icons.Filled.RocketLaunch,
-        modelId = "qwen3:1.7b-fp16"
+        modelId = "qwen3:1.7b"
     )
 )
 

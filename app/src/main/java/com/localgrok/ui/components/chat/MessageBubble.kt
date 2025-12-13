@@ -4,11 +4,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,11 +22,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -220,15 +223,31 @@ fun AssistantMessageBubble(
                 }
 
             // Tool execution indicator - shown when executing or when completed
-            if (isExecutingTool) {
-                // Active tool execution
+            if (isExecutingTool && responseStatus != ResponseStatus.STREAMING) {
+                // Active tool execution (but not streaming content yet)
                 ToolExecutionIndicator(
                     displayText = toolDisplayName ?: "Working...",
                     isCompleted = false,
                     colors = colors
                 )
-                // Don't show anything else while tool is executing
+                // Don't show anything else while tool is executing (unless streaming)
                 return@Row
+            } else if (isExecutingTool && responseStatus == ResponseStatus.STREAMING) {
+                // Tool is executing AND content is streaming - show both
+                ToolExecutionIndicator(
+                    displayText = toolDisplayName ?: "Working...",
+                    isCompleted = false,
+                    colors = colors
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else if (toolWasUsed && responseStatus == ResponseStatus.STREAMING && !isExecutingTool && (toolDisplayName != null || detectedToolName != null)) {
+                // Tool was used, content is streaming, but tool execution is complete - show past tense
+                ToolExecutionIndicator(
+                    displayText = toolDisplayName ?: detectedToolName ?: "Completed",
+                    isCompleted = true,
+                    colors = colors
+                )
+                Spacer(modifier = Modifier.height(8.dp))
             } else if (toolWasUsed && responseStatus == ResponseStatus.COMPLETE && detectedToolName != null) {
                 // Completed tool execution - show past tense
                 ToolExecutionIndicator(
@@ -266,29 +285,41 @@ fun AssistantMessageBubble(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Show spinner when waiting for first token (non-thinking mode)
+            // Show pulsing dot when waiting for first token (non-thinking mode)
             val showLoadingSpinner = !isReasoningEnabled &&
                     message.content.isBlank() &&
                     responseStatus == ResponseStatus.STREAMING &&
                     !showThinkingIndicator
 
             if (showLoadingSpinner) {
-                CircularProgressIndicator(
-                    color = colors.textPrimary,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(24.dp)
+                val infiniteTransition = rememberInfiniteTransition(label = "loading_pulse")
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 0.8f,
+                    targetValue = 1.2f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(600, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "pulse_scale"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .background(
+                            color = colors.textPrimary,
+                            shape = CircleShape
+                        )
                 )
             }
 
-            // Actual content with streaming text (no cursor)
-            AnimatedVisibility(
-                visible = !showThinkingIndicator && message.content.isNotBlank(),
-                enter = fadeIn(animationSpec = tween(300, delayMillis = 100)) + scaleIn(
-                    initialScale = 0.98f,
-                    animationSpec = tween(300, delayMillis = 100)
-                ),
-                exit = fadeOut(animationSpec = tween(200))
-            ) {
+            // Actual content with streaming text (no animation, direct display)
+            // Always render Markdown to prevent reveal effect from conditional appearance
+            if (!showThinkingIndicator) {
                 Markdown(
                     content = message.content,
                     colors = markdownColor(
@@ -298,7 +329,7 @@ fun AssistantMessageBubble(
                         linkText = colors.accent,
                         inlineCodeText = colors.textPrimary,
                         inlineCodeBackground = colors.darkGrey,
-                        dividerColor = colors.borderGrey
+                        dividerColor = Color.Transparent
                     ),
                     typography = markdownTypography(
                         h1 = MaterialTheme.typography.headlineMedium.copy(
